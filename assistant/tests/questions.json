@@ -720,5 +720,21 @@
  {
   "q": "who can see my maintenance report",
   "expect": "maintenance-handling"
+ },
+ {
+  "q": "any new tenders for flooring?",
+  "expect": "about-market"
+ },
+ {
+  "q": "what are our competitors saying on their websites",
+  "expect": "about-market"
+ },
+ {
+  "q": "market watch looks out of date",
+  "expect": "market-refresh"
+ },
+ {
+  "q": "give someone else market watch",
+  "expect": "market-access"
  }
 ]
