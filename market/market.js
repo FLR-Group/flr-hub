@@ -5,7 +5,7 @@
      - every weekday morning: local news sorted into leads and LinkedIn post ideas
        (Firecrawl reads each new story and says why it matters), and public tenders
        that mention flooring;
-     - every Monday: a check of flr.co.uk's counters, and what people search for
+     - every Monday: what people search for
        (Google Trends, UK);
      - on the 3rd of each month: what five rival contractors' homepages claim.
    Website visits (Similarweb) are switched off to save Firecrawl credits (the
@@ -21,7 +21,6 @@
                        buyer, area, value, closes, local, firstSeen }],
        competitors: [{ name, url, area, us, headline, claims[], sectors[], services[], work[], brands[] }],
        trends:      { terms[], england[], related: [{ query, score, rise }] },
-       site:        { counters: [{ label, value }], checks: [{ ok, text }] },
        traffic:     { month, sites: [{ name, domain, us, visits }] } }
    firstSeen is when Market Watch first found the item: "New" marks the last 24 hours.
 
@@ -104,10 +103,6 @@
           { query: 'commercial flooring company', score: 24, rise: '+60%' }, { query: 'commercial flooring contractors', score: 19, rise: '+40%' }, { query: 'commercial flooring services', score: 19, rise: '+60%' },
           { query: 'commercial flooring installation', score: 16, rise: '+40%' }, { query: 'commercial flooring service', score: 13, rise: '+250%' }],
       },
-      site: {
-        counters: [{ label: 'Projects in 2025', value: '1,155+' }, { label: 'Miles covered', value: '769,600+' }, { label: 'm² flooring covered', value: '0+' }, { label: 'Happy customers', value: '0+' }],
-        checks: [{ ok: false, text: '“m² flooring covered” and “Happy customers” show 0+' }, { ok: false, text: 'Main buttons are bright green (#00BF63), not FLR navy' }, { ok: false, text: 'Headings use Helvetica Neue, not Eurostile' }, { ok: true, text: 'Homepage loads and lists the latest case studies' }],
-      },
       traffic: { month: '2026-09', sites: [{ name: 'FLR Group', domain: 'flr.co.uk', us: true, visits: 1901 }, { name: 'Solihull Flooring', domain: 'solihullflooring.co.uk', visits: 1206 }, { name: 'Stebro', domain: 'stebro-flooring.co.uk', visits: 1147 }, { name: 'The Commercial Flooring Company', domain: 'commercialflooring.uk.net', visits: 317 }, { name: 'Newlay', domain: 'newlayfloors.co.uk', visits: 215 }, { name: 'Pinnacle', domain: 'pinnacleflooring.co.uk', visits: null }] },
     };
   }
@@ -184,15 +179,13 @@
         const fresh = (DATA.items || []).filter(isNew);
         const freshNews = fresh.filter(i => i.kind !== 'tender'), freshTenders = fresh.filter(i => i.kind === 'tender');
         const soon = items('tender').filter(t => closesSoon(t.closes));
-        const zero = ((DATA.site && DATA.site.checks) || []).filter(c => !c.ok).length;
         const stat = (n, text, go, alert) => h('button', { class: 'stat' + (alert && n ? ' alert' : ''), type: 'button', onclick: () => pick(go) }, h('b', { text: String(n) }), h('span', { text }));
         return [
           h('h2', { text: 'Since yesterday' }), when('daily', '2 November 2026'),
           h('div', { class: 'stats' },
             stat(items('lead').length, 'possible leads', 'news'),
             stat(items('tender').length, 'open tenders', 'tenders'),
-            stat(soon.length, 'tenders closing within 2 weeks', 'tenders', true),
-            stat(zero, 'things to fix on flr.co.uk', 'site', true)),
+            stat(soon.length, 'tenders closing within 2 weeks', 'tenders', true)),
           freshNews.length ? h('h3', { class: 'section', text: 'New stories' }) : null,
           freshNews.length ? front(leadsFirst(freshNews).slice(0, 7), '') : null,
           freshTenders.length ? h('h3', { class: 'section', text: 'New tenders' }) : null,
@@ -255,25 +248,6 @@
             h('div', { class: 'card' }, h('h3', { text: 'Searched alongside “commercial flooring”' }),
               h('div', { class: 'scroll' }, h('table', {}, h('thead', {}, h('tr', {}, h('th', { text: 'Phrase' }), h('th', { class: 'num', text: 'Score' }), h('th', { class: 'num', text: 'Rising' }))),
                 h('tbody', {}, (t.related || []).map(r => h('tr', {}, h('td', { text: r.query }), h('td', { class: 'num', text: r.score == null ? '' : String(r.score) }), h('td', { class: 'num' }, r.rise ? h('span', { class: 'up', text: r.rise }) : '')))))))),
-        ];
-      },
-    },
-    site: {
-      label: 'flr.co.uk',
-      count: () => ((DATA.site && DATA.site.checks) || []).filter(c => !c.ok).length,
-      render() {
-        const s = DATA.site || {};
-        return [
-          h('h2', { text: 'flr.co.uk check' }), when('weekly', '2 November 2026'),
-          h('p', { class: 'note', text: 'Firecrawl reads the live homepage every Monday and checks it against the brand guidelines (FLR navy, Eurostile headings).' }),
-          h('div', { class: 'grid' },
-            h('div', { class: 'card' }, h('h3', { text: 'Checks' }), h('ul', { class: 'checks' }, (s.checks || []).map(c => h('li', {}, h('span', { class: c.ok ? 'ok' : 'bad', 'aria-label': c.ok ? 'OK' : 'Needs fixing', text: c.ok ? '✓' : '!' }), h('span', { text: c.text }))))),
-            h('div', { class: 'card' }, h('h3', { text: 'Counters as the page shows them' }),
-              h('table', {}, h('tbody', {}, (s.counters || []).map(c => h('tr', {}, h('td', { text: c.label }), h('td', { class: 'num' + (/^0\+?$/.test(String(c.value).trim()) ? ' closes soon' : ''), text: c.value })))))),
-            h('div', { class: 'card' }, h('h3', { text: 'Brand colours' }),
-              h('p', {}, h('span', { class: 'sw sw-navy' }), 'FLR navy #00098B: the guideline colour'),
-              h('p', {}, h('span', { class: 'sw sw-green' }), 'Bright green #00BF63: the site’s main buttons'),
-              h('p', {}, h('span', { class: 'sw sw-blue' }), 'Link blue #428BCA: the theme’s default links'))),
         ];
       },
     },
