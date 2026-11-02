@@ -135,6 +135,21 @@
 
   /* ---------------------------------------------------------------- state */
   let DATA = null;
+  // 1.6 (the user, 2 Nov 2026: "remove it from Needs a date and add it to the calendar"): a deal waiting for a date that
+  // was found in its surveyor's Outlook diary becomes a booking on that day, marked From Outlook (HubSpot still has no
+  // date; nothing is written to HubSpot). It leaves Needs a date.
+  function withOutlook(d) {
+    if (!d || !Array.isArray(d.outlook) || !d.outlook.length) return d;
+    const hit = new Map(d.outlook.map(o => [String(o.deal), o]));
+    const moved = (d.needDate || []).filter(x => hit.has(String(x.id)));
+    if (!moved.length) return d;
+    const bookings = (d.bookings || []).concat(moved.map(x => {
+      const o = hit.get(String(x.id));
+      return { id: x.id, name: x.name, surveyor: x.surveyor, day: o.day, time: o.time || null, at: `${o.day}T${o.time || '12:00'}:00`,
+        postcode: x.postcode || '', address: '', stage: x.stage || '', url: x.url, outlook: o.subject };
+    }));
+    return Object.assign({}, d, { bookings, needDate: (d.needDate || []).filter(x => !hit.has(String(x.id))) });
+  }
   const todayIso = isoDay(new Date());
   let shown = (d => new Date(d.getFullYear(), d.getMonth(), 1))(parse(todayIso));
   let selected = todayIso;
@@ -152,7 +167,7 @@
     $('#sheetTitle').textContent = short(b.name);
     $('#sheetWhere').replaceChildren(h('b', null, b.postcode || 'No postcode in HubSpot'), b.address ? ' · ' + b.address : '');
     $('#sheetWho').textContent = s ? 'Surveyor: ' + s.name : 'Surveyor: not set';
-    $('#sheetStage').textContent = b.stage ? 'HubSpot stage: ' + b.stage : '';
+    $('#sheetStage').textContent = (b.stage ? 'HubSpot stage: ' + b.stage : '') + (b.outlook ? (b.stage ? ' · ' : '') + 'Date from Outlook (“' + b.outlook + '”): not in HubSpot yet' : '');
     const a = $('#sheetLink');
     a.hidden = !/^https:\/\/app\.hubspot\.com\//.test(b.url || '');
     if (!a.hidden) a.href = b.url;
@@ -202,7 +217,8 @@
       const shownEv = here.slice(0, 2).map(x => {
         const s = S.get(String(x.b.surveyor)), tm = tOf(x.b);
         const clash = clashOf(x.b, di);
-        return h('span', { class: 'ev ' + colour(x.b.surveyor) + (clash ? ' clash' : ''), title: clash ? `${s ? s.name : 'The surveyor'} is ${PART_LONG[clash.part]} that day` : null },
+        return h('span', { class: 'ev ' + colour(x.b.surveyor) + (clash ? ' clash' : '') + (x.b.outlook ? ' from-ol' : ''),
+          title: clash ? `${s ? s.name : 'The surveyor'} is ${PART_LONG[clash.part]} that day` : x.b.outlook ? 'From Outlook: not in HubSpot yet' : null },
           h('span', { class: 'n' }, (s ? s.name.split(' ')[0] : 'No surveyor') + (clash ? ' ⚠' : '')),
           h('span', { class: 'p' }, [tm, x.b.postcode || 'No postcode'].filter(Boolean).join(' · ')));
       });
@@ -236,13 +252,14 @@
       h('span', { class: 'nm' }, offName(o)), h('span', { class: 'pt' }, PART_LONG[o.part] || 'off'))));
     $('#dayList').replaceChildren(...(here.length ? here.map(x => {
       const b = x.b, s = S.get(String(b.surveyor)), tm = tOf(b), c = colour(b.surveyor);
-      return h('li', null, h('button', { class: 'evc ' + c, type: 'button', onclick: () => openSheet(b),
+      return h('li', null, h('button', { class: 'evc ' + c + (b.outlook ? ' from-ol' : ''), type: 'button', onclick: () => openSheet(b),
         'aria-label': `${tm || 'Time not set'}, ${short(b.name)}, ${b.postcode || 'no postcode'}${s ? ', ' + s.name : ''}` },
         h('span', { class: 'd' }, fmtShort.format(d) + (s ? ' · ' + s.name : '')),
         h('span', { class: 't' }, short(b.name)),
         h('span', { class: 'pc' + (b.postcode ? '' : ' miss') }, b.postcode || 'No postcode'),
         h('span', { class: 'meta' }, icon('i-clock'), tm || 'Time not set', b.address ? ' · ' + b.address : ''),
         clashOf(b, selected) ? h('span', { class: 'clash-note' }, `⚠ ${s ? s.name.split(' ')[0] : 'The surveyor'} is ${PART_LONG[clashOf(b, selected).part]} this day (Annual Leave)`) : null,
+        b.outlook ? h('span', { class: 'ol-tag' }, 'From Outlook: “' + b.outlook + '” · not in HubSpot yet') : null,
         h('span', { class: 'who' }, h('span', { class: 'mini' }, initials(s ? s.name : '?')), h('span', { class: 'bar' }, h('i')), b.stage || '')));
     }) : [h('li', { class: 'none' }, 'No surveys booked.')]));
   }
@@ -317,7 +334,7 @@
     return data;
   }
   async function show() {
-    DATA = await load();
+    DATA = withOutlook(await load());
     fillWho(); render();
     document.body.dataset.view = 'ready';
     $('#view').hidden = false;
@@ -336,7 +353,7 @@
   // Read again every 5 minutes while open (the function reads HubSpot every 15).
   setInterval(async () => {
     if (document.hidden || document.body.dataset.view !== 'ready' || (DATA && DATA.sample)) return;
-    try { const d = await load(); if (d) { DATA = d; fillWho(); render(); } } catch (e) { /* keep what's shown */ }
+    try { const d = await load(); if (d) { DATA = withOutlook(d); fillWho(); render(); } } catch (e) { /* keep what's shown */ }
   }, 5 * 60e3);
 
   async function boot() {
