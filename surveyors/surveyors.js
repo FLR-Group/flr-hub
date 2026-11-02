@@ -142,12 +142,19 @@
     if (!d || !Array.isArray(d.outlook) || !d.outlook.length) return d;
     const hit = new Map(d.outlook.map(o => [String(o.deal), o]));
     const moved = (d.needDate || []).filter(x => hit.has(String(x.id)));
-    if (!moved.length) return d;
+    // 1.6: Outlook bookings for deals that aren't waiting for a date carry their own surveyor and deal name
+    const waiting = new Set((d.needDate || []).map(x => String(x.id)));
+    const booked = new Set((d.bookings || []).map(x => String(x.id) + '|' + x.day));
+    const others = d.outlook.filter(o => !waiting.has(String(o.deal)) && o.surveyor && o.name && !booked.has(String(o.deal) + '|' + o.day));
+    if (!moved.length && !others.length) return d;
+    const at = o => `${o.day}T${o.time || '12:00'}:00`;
+    const url = id => /^\d{1,20}$/.test(String(id)) ? `https://app.hubspot.com/contacts/4983883/record/0-3/${id}` : '';
     const bookings = (d.bookings || []).concat(moved.map(x => {
       const o = hit.get(String(x.id));
-      return { id: x.id, name: x.name, surveyor: x.surveyor, day: o.day, time: o.time || null, at: `${o.day}T${o.time || '12:00'}:00`,
+      return { id: x.id, name: x.name, surveyor: x.surveyor, day: o.day, time: o.time || null, at: at(o),
         postcode: x.postcode || '', address: '', stage: x.stage || '', url: x.url, outlook: o.subject };
-    }));
+    }), others.map(o => ({ id: String(o.deal), name: o.name, surveyor: String(o.surveyor), day: o.day, time: o.time || null, at: at(o),
+      postcode: o.postcode || '', address: '', stage: o.stage || '', url: url(o.deal), outlook: o.subject })));
     return Object.assign({}, d, { bookings, needDate: (d.needDate || []).filter(x => !hit.has(String(x.id))) });
   }
   const todayIso = isoDay(new Date());
