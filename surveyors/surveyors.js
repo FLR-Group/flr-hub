@@ -124,6 +124,7 @@
       off: [{ day: iso(addDays(mon, 1)), surveyor: 's1', part: 'all' }, { day: iso(addDays(mon, 2)), surveyor: 's1', part: 'all' },
         { day: iso(addDays(mon, 3)), surveyor: 's4', part: 'pm' }, { day: iso(addDays(mon, 8)), surveyor: 's3', part: 'am' }],
       closures: [],
+      outlook: [{ deal: 'd2', day: iso(addDays(mon, 9)), time: '09:00', subject: 'Fire station dignity rooms' }],
       needDate: [
         { id: 'd1', name: 'Grange Church - New premises - ME', surveyor: 's5', postcode: '', stage: 'Appointment Scheduled', url: '#sample' },
         { id: 'd2', name: 'Fire Station - Dignity rooms - PS', surveyor: 's2', postcode: 'WV1 1AA', stage: 'Allocated to Surveyor', url: '#sample' },
@@ -248,11 +249,23 @@
 
   function renderTrays() {
     const S = byId();
+    // 1.5: a likely date from the surveyor's Outlook diary, for a deal still waiting for one in HubSpot
+    const hints = new Map((DATA.outlook || []).map(o => [String(o.deal), o]));
+    const hintOf = d => {
+      const o = hints.get(String(d.id)); if (!o) return null;
+      return h('span', { class: 'ol', title: 'An entry in the surveyor’s Outlook diary that names this job. Add the date in HubSpot to put it on the calendar.' },
+        h('b', null, 'In Outlook: '), fmtLong.format(parse(o.day)).replace(/^(\w{3})\w*/, '$1') + (o.time ? ' · ' + o.time : '') + ' · “' + o.subject + '”');
+    };
     const row = (d, meta) => h('li', null, h('a', { href: /^https:\/\/app\.hubspot\.com\//.test(d.url || '') ? d.url : '#', target: '_blank', rel: 'noopener' },
       h('span', { class: 'nm' }, short(d.name)), h('span', { class: 'meta' }, meta),
-      h('span', { class: 'pc' + (d.postcode ? '' : ' miss') }, d.postcode || 'No postcode')));
+      h('span', { class: 'pc' + (d.postcode ? '' : ' miss') }, d.postcode || 'No postcode'), hintOf(d)));
     const ns = (DATA.needSurveyor || []).slice().sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-    const nd = (DATA.needDate || []).filter(d => !who || String(d.surveyor) === who);
+    const nd = (DATA.needDate || []).filter(d => !who || String(d.surveyor) === who)
+      .sort((a, b) => (hints.has(String(b.id)) ? 1 : 0) - (hints.has(String(a.id)) ? 1 : 0));   // the ones Outlook can date first
+    const found = nd.filter(d => hints.has(String(d.id))).length;
+    $('#outlookNote').hidden = !found && !DATA.outlookError;
+    $('#outlookNote').textContent = found ? `${found} of these ${found === 1 ? 'is' : 'are'} in the surveyor’s Outlook diary: add the date in HubSpot to put ${found === 1 ? 'it' : 'them'} on the calendar.`
+      : DATA.outlookError ? 'Outlook diaries couldn’t be read just now.' : '';
     const fill = (list, items, countEl, empty) => {
       $(countEl).textContent = String(items.length); $(countEl).classList.toggle('zero', !items.length);
       $(list).replaceChildren(...(items.length ? items : [h('li', { class: 'empty' }, empty)]));
