@@ -2627,6 +2627,8 @@
         "open market watch",
         "show me new leads",
         "any new tenders",
+        "which contractors have won work",
+        "contractor wins",
         "what are our competitors doing",
         "what do people search for",
         "how many visits does our website get"
@@ -2640,7 +2642,7 @@
         "website traffic",
         "news"
       ],
-      "answer": "Market Watch keeps an eye on FLR’s market. Every weekday morning it gathers local news as leads and LinkedIn post ideas, each with its picture and a link to the story, and lists public tenders that mention flooring. On Mondays it checks Google Trends, and on the 3rd of each month it reads five rival contractors’ homepages. Anything found in the last 24 hours is marked New. It starts with FLR Super Admins and the marketing account; to get it, ask an FLR Super Admin.",
+      "answer": "Market Watch keeps an eye on FLR’s market. Every weekday morning it gathers local news as leads and LinkedIn post ideas, each with its picture and a link to the story, and lists public tenders that mention flooring. On Mondays it checks Google Trends and looks for main contractors that have won Midlands jobs (Contractor wins on the Leads tab: the firms to approach about the flooring), and on the 3rd of each month it reads five rival contractors’ homepages. Anything found in the last 24 hours is marked New. It starts with FLR Super Admins and the marketing account; to get it, ask an FLR Super Admin.",
       "link": {
         "tile": "market",
         "label": "Open Market Watch"
@@ -2667,7 +2669,7 @@
         "late",
         "out of date"
       ],
-      "answer": "Market Watch refreshes news and tenders at 6:30 every weekday morning (7:30 in summer), search trends on Mondays, and rivals’ websites on the 3rd of each month. Website visits aren’t refreshed for now, to save Firecrawl credits. Each section says when it was last updated, in red if a refresh didn’t work. If it stays red, tell an FLR Super Admin.",
+      "answer": "Market Watch refreshes news and tenders at 6:30 every weekday morning (7:30 in summer), search trends and contractor wins on Mondays, and rivals’ websites on the 3rd of each month. Website visits aren’t refreshed for now, to save Firecrawl credits. Each section says when it was last updated, in red if a refresh didn’t work. If it stays red, tell an FLR Super Admin.",
       "link": {
         "tile": "market",
         "label": "Open Market Watch"
