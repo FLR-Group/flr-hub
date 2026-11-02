@@ -79,14 +79,14 @@
       items: [
         it({ id: 's1', kind: 'tender', url: 'https://www.find-tender.service.gov.uk/procurement/ocds-h6vhtk-0782b9', title: 'Interim Capital Programme', buyer: 'Sandwell Metropolitan Borough Council', area: 'West Midlands', value: '£9.6m a year for 2 years', closes: '2026-11-13T15:00:00Z', local: true, summary: 'Component replacement works on council properties, including flooring renewals. No separate flooring lot.', why: 'Approach the main contractors bidding for it about the flooring package.' }),
         it({ id: 's2', kind: 'tender', url: 'https://www.architectsjournal.co.uk/competitions/coventry-schools-expansion-framework-2027-31', title: 'Coventry schools expansion framework 2027–31', buyer: 'Coventry City Council', area: 'West Midlands', value: '£5m', closes: '2026-11-16T12:00:00Z', local: true, summary: 'Framework for school expansion and capital projects.', why: 'Listed under architects’ competitions, so check it covers contractors.' }),
-        it({ id: 's3', kind: 'lead', url: 'https://www.placemidlands.co.uk/bruntwood-scitech-picks-estilo-for-1-5m-office-fit-out/', title: 'Bruntwood SciTech picks Estilo for £1.5m Centre City fit-out', source: 'Place North West Midlands', published: '3 weeks ago', summary: 'About 30,000 sq ft of Cat A+ and Cat B fit-out on floors 5, 12 and 20 near New Street.', why: 'Approach Estilo Interiors about the flooring package.' }),
-        it({ id: 's4', kind: 'lead', url: 'https://www.thebusinessdesk.com/westmidlands/news/2117736-office-principles-north-rebrands-as-kinspace', title: 'Office Principles North rebrands as kinspace', source: 'TheBusinessDesk', published: '4 weeks ago', summary: 'A Midlands workplace design and fit-out firm with a big-name client list.', why: 'A possible regular flooring partner.' }),
-        it({ id: 's5', kind: 'lead', url: 'https://www.greaterbirminghamchambers.com/resource/property-consultancy-secures-new-office-letting-at-friars-gate.html', title: 'CIPP takes new office space at Friars Gate', source: 'Greater Birmingham Chambers', published: '1 week ago', summary: 'A new letting, so a fit-out is likely.', why: 'Find out who is delivering the fit-out.' }),
-        it({ id: 's6', kind: 'lead', url: 'https://www.aol.com/articles/grand-theatre-set-8-5m-162725000.html', title: 'Wolverhampton Grand Theatre: £8.5m repair work', source: 'AOL', published: '2 weeks ago', summary: 'Repair and maintenance work agreed by the city council.', why: 'Our Hippodrome track record is the way in.' }),
-        it({ id: 's7', kind: 'lead', url: 'https://www.insidermedia.com/news/midlands/pegasus-care-makes-north-east-buy-in-first-expansion-outside-of-the-west-midlands', title: 'Pegasus Care expands beyond the West Midlands', source: 'Insider Media', published: '2 weeks ago', summary: 'A growing West Midlands care group.', why: 'A prospect for care-home refurbishments.' }),
-        it({ id: 's8', kind: 'post', url: 'https://www.birmingham-now.co.uk/news/26611278.birmingham-one-uks-highest-office-rent-prices/', title: 'Birmingham is the 3rd most expensive office city outside London', source: 'Birmingham Now', published: '3 weeks ago', summary: '£24.84 per sq ft on average.', why: 'At that rent, every square foot should work hard.' }),
-        it({ id: 's9', kind: 'post', url: 'https://www.deloitte.com/uk/en/about/press-room/deloitte-makes-long-term-investment-in-midlands-with-move-to-new-birmingham-headquarters.html', title: 'Deloitte opens its new HQ at One Centenary Way', source: 'Deloitte', published: '2 weeks ago', summary: 'A major firm moves into new Birmingham offices.', why: 'A post on the fit-out quality big firms now expect.' }),
-        it({ id: 's10', kind: 'post', url: 'https://www.gov.uk/government/news/140-million-boost-to-urgent-care-to-ease-winter-pressures-on-nhs', title: '£140m for NHS urgent care, including Midlands sites', source: 'GOV.UK', published: '2 weeks ago', summary: 'New urgent treatment centres at the QE Birmingham and Royal Stoke.', why: 'A healthcare-flooring post, and a pointer to future NHS work.' }),
+        it({ id: 's3', image: 'https://www.placemidlands.co.uk/wp-content/uploads/centrecity-estilo-p-estilo-e1791800780926.jpeg', kind: 'lead', url: 'https://www.placemidlands.co.uk/bruntwood-scitech-picks-estilo-for-1-5m-office-fit-out/', title: 'Bruntwood SciTech picks Estilo for £1.5m Centre City fit-out', source: 'Place Midlands', published: '2026-10-12T10:28:15+00:00', summary: 'About 30,000 sq ft of Cat A+ and Cat B fit-out on floors 5, 12 and 20 near New Street.', why: 'Approach Estilo Interiors about the flooring package.' }),
+        it({ id: 's4', image: 'https://www.thebusinessdesk.com/_files/images/oct_26/kinspace-Stephen-Parsons-10.26.jpg', kind: 'lead', url: 'https://www.thebusinessdesk.com/westmidlands/news/2117736-office-principles-north-rebrands-as-kinspace', title: 'Office Principles North rebrands as kinspace', source: 'TheBusinessDesk', published: '2026-10-06T11:26:38+00:00', summary: 'A Midlands workplace design and fit-out firm with a big-name client list.', why: 'A possible regular flooring partner.' }),
+        it({ id: 's5', image: 'https://www.greaterbirminghamchambers.com/static/95758424-cc66-4f41-95fdea0aa9866956/opengraphimage_83f4e8796336604b59d7216d0ecd81a5_4a7c7e45a350/Friars-Gate-Solihull.jpg', kind: 'lead', url: 'https://www.greaterbirminghamchambers.com/resource/property-consultancy-secures-new-office-letting-at-friars-gate.html', title: 'CIPP takes new office space at Friars Gate', source: 'Greater Birmingham Chambers', published: '1 week ago', summary: 'A new letting, so a fit-out is likely.', why: 'Find out who is delivering the fit-out.' }),
+        it({ id: 's6', image: 'https://hermes.media.static.aol.com/media/2026/10/21/c8c3813b-797b-3052-8674-ded33ab51ff2/d5a4b786-2fcd-49d6-8c5f-dd92f84dfbd7.jpg', kind: 'lead', url: 'https://www.aol.com/articles/grand-theatre-set-8-5m-162725000.html', title: 'Wolverhampton Grand Theatre: £8.5m repair work', source: 'AOL', published: '2 weeks ago', summary: 'Repair and maintenance work agreed by the city council.', why: 'Our Hippodrome track record is the way in.' }),
+        it({ id: 's7', image: 'https://www.insidermedia.com/uploads/news/images/Pegasus_Care_Chesters.jpg', kind: 'lead', url: 'https://www.insidermedia.com/news/midlands/pegasus-care-makes-north-east-buy-in-first-expansion-outside-of-the-west-midlands', title: 'Pegasus Care expands beyond the West Midlands', source: 'Insider Media', published: '2 weeks ago', summary: 'A growing West Midlands care group.', why: 'A prospect for care-home refurbishments.' }),
+        it({ id: 's8', image: 'https://www.birmingham-now.co.uk/resources/images/21543799.jpg?type=og-image', kind: 'post', url: 'https://www.birmingham-now.co.uk/news/26611278.birmingham-one-uks-highest-office-rent-prices/', title: 'Birmingham is the 3rd most expensive office city outside London', source: 'Birmingham Now', published: '2026-10-11T12:00:00Z', summary: '£24.84 per sq ft on average.', why: 'At that rent, every square foot should work hard.' }),
+        it({ id: 's9', image: 'https://media.deloitte.com/is/image/deloitte/deloitte-new-birmingham-headquarters-banner:1200-x-627', kind: 'post', url: 'https://www.deloitte.com/uk/en/about/press-room/deloitte-makes-long-term-investment-in-midlands-with-move-to-new-birmingham-headquarters.html', title: 'Deloitte opens its new HQ at One Centenary Way', source: 'Deloitte', published: '2 weeks ago', summary: 'A major firm moves into new Birmingham offices.', why: 'A post on the fit-out quality big firms now expect.' }),
+        it({ id: 's10', image: 'https://assets.publishing.service.gov.uk/media/6ad5d9a3dfa45fcb6753cb8c/s960_busy_nhs_ward_blurred.jpg', kind: 'post', url: 'https://www.gov.uk/government/news/140-million-boost-to-urgent-care-to-ease-winter-pressures-on-nhs', title: '£140m for NHS urgent care, including Midlands sites', source: 'GOV.UK', published: '2026-10-17T23:23:00Z', summary: 'New urgent treatment centres at the QE Birmingham and Royal Stoke.', why: 'A healthcare-flooring post, and a pointer to future NHS work.' }),
       ],
       competitors: [
         { name: 'FLR Group', url: 'https://www.flr.co.uk/', area: 'Solihull', us: true, headline: 'Commercial Flooring Contractors', claims: ['Projects in 2025, miles covered and "Established since" counters', 'm² and happy customers counters show 0+'], sectors: ['Schools', 'Leisure & hospitality', 'Offices', 'Healthcare', 'Retail'], services: ['Carpet tiles', 'Carpets', 'Safety flooring', 'Installation', 'Loose lay'], work: ['Feal Pilates', 'Perspective Opticians', 'Prince & Bates Opticians'], brands: [] },
@@ -140,11 +140,47 @@
   }
   function list(rows, empty) { return h('ul', { class: 'list' }, rows.length ? rows.map(itemRow) : h('li', { class: 'empty', text: empty })); }
 
+  /* ---------------------------------------------------------------- news cards: the story's own picture, headline, what it means for FLR, and the link */
+  const fmtPub = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, day: 'numeric', month: 'short' });
+  const pubText = v => { const t = /^\d{4}-\d{2}-\d{2}/.test(String(v || '')) ? Date.parse(v) : NaN; return isNaN(t) ? String(v || '') : fmtPub.format(new Date(t)); };
+  const siteOf = u => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch (e) { return ''; } };
+  // No picture, or it won't load: a panel in the story's colour with the publisher's initials.
+  function noPicture(i) {
+    const who = i.source || siteOf(i.url) || '?';
+    return h('div', { class: 'pic none ' + i.kind, 'aria-hidden': 'true' }, h('span', { text: who.split(/[\s.]+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') }));
+  }
+  function picture(i) {
+    if (!/^https:\/\//.test(String(i.image || ''))) return noPicture(i);
+    const img = h('img', { src: i.image, alt: '', loading: 'lazy', decoding: 'async', referrerpolicy: 'no-referrer' });
+    img.addEventListener('error', () => img.parentNode && img.parentNode.replaceWith(noPicture(i)), { once: true });
+    return h('div', { class: 'pic' }, img);
+  }
+  function card(i, size) {   // size: 'hero' | 'std' | 'mini'
+    const tag = i.kind === 'lead' ? 'Lead' : 'Post idea';
+    const where = i.source || siteOf(i.url);
+    const href = safeUrl(i.url);
+    return h('article', { class: 'story ' + size + ' ' + i.kind },
+      href ? h('a', { class: 'pic-link', href, target: '_blank', rel: 'noopener', tabindex: '-1', 'aria-hidden': 'true' }, picture(i)) : picture(i),
+      h('div', { class: 'body' },
+        h('p', { class: 'kicker' }, h('span', { class: 'tag ' + i.kind, text: tag }), isNew(i) ? h('span', { class: 'new', text: 'New' }) : null,
+          h('span', { class: 'src', text: [where, pubText(i.published)].filter(Boolean).join(' · ') })),
+        h('h3', { class: 'headline' }, link(i.url, i.title || i.url)),
+        size !== 'mini' && i.summary ? h('p', { class: 'standfirst', text: i.summary }) : null,
+        i.why ? h('p', { class: 'why' }, h('strong', { text: i.kind === 'post' ? 'Post idea' : 'Next step' }), ' ', i.why) : null,
+        href ? h('a', { class: 'read', href, target: '_blank', rel: 'noopener' }, 'Read on ' + (where || 'the website'), h('span', { 'aria-hidden': 'true', text: '↗' })) : null));
+  }
+  function front(rows, empty) {   // the first story large, the rest in a grid
+    if (!rows.length) return h('p', { class: 'empty card', text: empty });
+    return h('div', { class: 'front' }, card(rows[0], 'hero'), rows.length > 1 ? h('div', { class: 'stories' }, rows.slice(1).map(r => card(r, 'std'))) : null);
+  }
+  const leadsFirst = rows => rows.slice().sort((a, b) => (a.kind === 'lead' ? 0 : 1) - (b.kind === 'lead' ? 0 : 1) || (Date.parse(b.firstSeen) || 0) - (Date.parse(a.firstSeen) || 0));
+
   const PANES = {
     today: {
       label: 'Today', count: () => (DATA.items || []).filter(isNew).length,
       render() {
         const fresh = (DATA.items || []).filter(isNew);
+        const freshNews = fresh.filter(i => i.kind !== 'tender'), freshTenders = fresh.filter(i => i.kind === 'tender');
         const soon = items('tender').filter(t => closesSoon(t.closes));
         const zero = ((DATA.site && DATA.site.checks) || []).filter(c => !c.ok).length;
         const stat = (n, text, go, alert) => h('button', { class: 'stat' + (alert && n ? ' alert' : ''), type: 'button', onclick: () => pick(go) }, h('b', { text: String(n) }), h('span', { text }));
@@ -155,8 +191,11 @@
             stat(items('tender').length, 'open tenders', 'tenders'),
             stat(soon.length, 'tenders closing within 2 weeks', 'tenders', true),
             stat(zero, 'things to fix on flr.co.uk', 'site', true)),
-          h('h3', { text: fresh.length ? 'New today' : 'Nothing new today' }),
-          fresh.length ? list(fresh.slice(0, 8), '') : h('p', { class: 'note', text: 'Market Watch didn’t find new stories or tenders this morning. The lists keep the last 30 days.' }),
+          freshNews.length ? h('h3', { class: 'section', text: 'New stories' }) : null,
+          freshNews.length ? front(leadsFirst(freshNews).slice(0, 7), '') : null,
+          freshTenders.length ? h('h3', { class: 'section', text: 'New tenders' }) : null,
+          freshTenders.length ? list(freshTenders, '') : null,
+          fresh.length ? null : h('p', { class: 'note', text: 'Market Watch didn’t find new stories or tenders this morning. The lists keep the last 30 days.' }),
         ];
       },
     },
@@ -169,7 +208,7 @@
           h('h2', { text: 'Leads and post ideas' }), when('daily', '2 November 2026'),
           h('p', { class: 'note', text: 'Midlands office, school, healthcare and care-home stories from the last month. Firecrawl reads each new story and says whether it could be work for FLR or a LinkedIn post.' }),
           h('div', { class: 'filters', role: 'group', 'aria-label': 'Show' }, chip('all', 'All'), chip('lead', 'Leads'), chip('post', 'Post ideas')),
-          list(rows, 'No stories in the last 30 days.'),
+          front(leadsFirst(rows), 'No stories in the last 30 days.'),
         ];
       },
     },

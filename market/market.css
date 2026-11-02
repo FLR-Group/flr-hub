@@ -115,6 +115,51 @@ section.pane{display:grid;gap:16px}
 .chip{display:inline-flex;align-items:center;min-height:32px;padding:0 12px;border:0;border-radius:999px;background:var(--surface);box-shadow:var(--sh-card);font:600 13.5px/1 var(--font-text);cursor:pointer;color:var(--ink)}
 .chip[aria-pressed="true"]{background:var(--tint-fill);color:var(--on-tint)}
 
+/* news: the first story large, the rest as cards, each with the story's own picture */
+h3.section{margin:10px 0 0;font:700 13px/1.3 var(--font-text);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+.front{display:grid;gap:16px}
+.stories{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:16px}
+.story{display:flex;flex-direction:column;min-width:0;background:var(--surface);border-radius:var(--r-card);box-shadow:var(--sh-card);overflow:hidden}
+.story .pic-link{display:block}
+.pic{position:relative;aspect-ratio:16/9;max-width:100%;background:var(--surface-2);overflow:hidden}
+.pic img{display:block;width:100%;height:100%;object-fit:cover}
+.pic.none{display:grid;place-items:center;background:linear-gradient(150deg,var(--tint-fill) 0%,color-mix(in srgb,var(--tint-fill) 55%,#000) 100%)}
+.pic.none.post{background:linear-gradient(150deg,#6b7280 0%,#374151 100%)}
+.pic.none span{font:800 34px/1 var(--font-display);letter-spacing:.04em;color:rgba(255,255,255,.88)}
+.story .body{display:flex;flex-direction:column;gap:8px;padding:14px 16px 16px;flex:1}
+.kicker{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:0}
+.kicker .tag{padding:3px 9px;border-radius:999px;font:700 11px/1.3 var(--font-text);letter-spacing:.03em;text-transform:uppercase;background:var(--tint-soft);color:var(--tint)}
+.kicker .tag.post{background:var(--fill);color:var(--ink-2)}
+.kicker .new{margin:0}
+.kicker .src{color:var(--ink-3);font-size:12.5px}
+.headline{margin:0;font:700 17px/1.3 var(--font-display);letter-spacing:-.01em;text-wrap:balance}
+.headline a{color:var(--ink);text-decoration:none}
+@media (hover:hover){.headline a:hover{color:var(--tint);text-decoration:underline}.story:hover .pic img{transform:scale(1.03)}}
+.pic img{transition:transform .4s ease}
+@media (prefers-reduced-motion:reduce){.pic img{transition:none}}
+.standfirst{margin:0;color:var(--ink-2);font-size:14.5px;line-height:1.5}
+.why{margin:0;padding:9px 11px;border-radius:10px;background:var(--tint-soft);font-size:13.5px;line-height:1.45}
+.story.post .why{background:var(--fill)}
+.why strong{color:var(--tint)}
+.story.post .why strong{color:var(--ink)}
+.read{margin-top:auto;align-self:flex-start;display:inline-flex;align-items:center;gap:5px;min-height:34px;padding:0 14px;border-radius:999px;background:var(--fill);color:var(--ink);font:600 13.5px/1 var(--font-text);text-decoration:none}
+@media (hover:hover){.read:hover{background:var(--tint-fill);color:var(--on-tint)}}
+.read:focus-visible,.headline a:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+/* the lead story: picture beside the text on wide screens */
+.story.hero{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr)}
+.story.hero .pic{aspect-ratio:auto;height:100%;min-height:280px}
+.story.hero .pic-link{height:100%}
+.story.hero .body{padding:22px 24px 24px;gap:12px;justify-content:center}
+.story.hero .headline{font-size:25px;line-height:1.2}
+.story.hero .standfirst{font-size:16px}
+.empty.card{margin:0}
+@media (max-width:760px){
+  .story.hero{display:flex}
+  .story.hero .pic{aspect-ratio:16/9;height:auto;min-height:0}
+  .story.hero .body{padding:16px}
+  .story.hero .headline{font-size:20px}
+}
+
 /* tables */
 .scroll{overflow-x:auto;background:var(--surface);border-radius:var(--r-card);box-shadow:var(--sh-card)}
 table{border-collapse:collapse;width:100%;font-size:14px}
