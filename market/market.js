@@ -220,7 +220,7 @@
         const rows = items('tender').slice().sort((a, b) => (b.local ? 1 : 0) - (a.local ? 1 : 0) || (Date.parse(a.closes) || 9e15) - (Date.parse(b.closes) || 9e15));
         return [
           h('h2', { text: 'Public tenders' }), when('daily', '2 November 2026'),
-          h('p', { class: 'note', text: 'Find a Tender notices that mention flooring, local ones first, soonest closing first. Contracts Finder can’t be searched automatically, so set up its free email alert for “flooring” in the West Midlands as well.' }),
+          h('p', { class: 'note', text: 'Open notices from Find a Tender and Contracts Finder. Firecrawl reads each new one and keeps it only if FLR could bid for it or win its flooring. Local ones first, then soonest closing.' }),
           list(rows, 'No open tenders mention flooring right now.'),
         ];
       },
