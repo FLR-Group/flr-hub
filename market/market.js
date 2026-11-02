@@ -83,7 +83,7 @@
         it({ id: 's1', kind: 'tender', url: 'https://www.find-tender.service.gov.uk/procurement/ocds-h6vhtk-0782b9', title: 'Interim Capital Programme', buyer: 'Sandwell Metropolitan Borough Council', area: 'West Midlands', value: '£9.6m a year for 2 years', closes: '2026-11-13T15:00:00Z', local: true, summary: 'Component replacement works on council properties, including flooring renewals. No separate flooring lot.', why: 'Approach the main contractors bidding for it about the flooring package.' }),
         it({ id: 's2', kind: 'tender', url: 'https://www.architectsjournal.co.uk/competitions/coventry-schools-expansion-framework-2027-31', title: 'Coventry schools expansion framework 2027–31', buyer: 'Coventry City Council', area: 'West Midlands', value: '£5m', closes: '2026-11-16T12:00:00Z', local: true, summary: 'Framework for school expansion and capital projects.', why: 'Listed under architects’ competitions, so check it covers contractors.' }),
         it({ id: 's3', image: 'https://www.placemidlands.co.uk/wp-content/uploads/centrecity-estilo-p-estilo-e1791800780926.jpeg', kind: 'lead', url: 'https://www.placemidlands.co.uk/bruntwood-scitech-picks-estilo-for-1-5m-office-fit-out/', title: 'Bruntwood SciTech picks Estilo for £1.5m Centre City fit-out', source: 'Place Midlands', published: '2026-10-12T10:28:15+00:00', summary: 'About 30,000 sq ft of Cat A+ and Cat B fit-out on floors 5, 12 and 20 near New Street.', why: 'Approach Estilo Interiors about the flooring package.' }),
-        it({ id: 's8', kind: 'lead', url: 'https://www.derbyshiretimes.co.uk/your-world/derbyshires-g-f-tomlinson-appointed-to-new-constructing-west-midlands-framework-9288701', title: 'G F Tomlinson appointed to the new Constructing West Midlands framework', source: 'Derbyshire Times', published: '2026-10-17T09:15:00+01:00', buyer: 'G F Tomlinson', area: 'West Midlands', value: '£2m to £15m jobs', local: true, summary: 'For Constructing West Midlands. One of six partners on the CWM3 Medium Works lot (schools, council buildings, courts).', why: 'Ask G F Tomlinson to add FLR to its flooring supply chain for CWM3 jobs.' }),
+        it({ id: 's11', kind: 'lead', url: 'https://www.derbyshiretimes.co.uk/your-world/derbyshires-g-f-tomlinson-appointed-to-new-constructing-west-midlands-framework-9288701', title: 'G F Tomlinson appointed to the new Constructing West Midlands framework', source: 'Derbyshire Times', published: '2026-10-17T09:15:00+01:00', buyer: 'G F Tomlinson', area: 'West Midlands', value: '£2m to £15m jobs', local: true, summary: 'For Constructing West Midlands. One of six partners on the CWM3 Medium Works lot (schools, council buildings, courts).', why: 'Ask G F Tomlinson to add FLR to its flooring supply chain for CWM3 jobs.' }),
         it({ id: 's4', image: 'https://www.thebusinessdesk.com/_files/images/oct_26/kinspace-Stephen-Parsons-10.26.jpg', kind: 'lead', url: 'https://www.thebusinessdesk.com/westmidlands/news/2117736-office-principles-north-rebrands-as-kinspace', title: 'Office Principles North rebrands as kinspace', source: 'TheBusinessDesk', published: '2026-10-06T11:26:38+00:00', summary: 'A Midlands workplace design and fit-out firm with a big-name client list.', why: 'A possible regular flooring partner.' }),
         it({ id: 's5', image: 'https://www.greaterbirminghamchambers.com/static/95758424-cc66-4f41-95fdea0aa9866956/opengraphimage_83f4e8796336604b59d7216d0ecd81a5_4a7c7e45a350/Friars-Gate-Solihull.jpg', kind: 'lead', url: 'https://www.greaterbirminghamchambers.com/resource/property-consultancy-secures-new-office-letting-at-friars-gate.html', title: 'CIPP takes new office space at Friars Gate', source: 'Greater Birmingham Chambers', published: '1 week ago', summary: 'A new letting, so a fit-out is likely.', why: 'Find out who is delivering the fit-out.' }),
         it({ id: 's6', image: 'https://hermes.media.static.aol.com/media/2026/10/21/c8c3813b-797b-3052-8674-ded33ab51ff2/d5a4b786-2fcd-49d6-8c5f-dd92f84dfbd7.jpg', kind: 'lead', url: 'https://www.aol.com/articles/grand-theatre-set-8-5m-162725000.html', title: 'Wolverhampton Grand Theatre: £8.5m repair work', source: 'AOL', published: '2 weeks ago', summary: 'Repair and maintenance work agreed by the city council.', why: 'Our Hippodrome track record is the way in.' }),
@@ -142,7 +142,16 @@
 
   /* ---------------------------------------------------------------- news cards: the story's own picture, headline, what it means for FLR, and the link */
   const fmtPub = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, day: 'numeric', month: 'short' });
-  const pubText = v => { const t = /^\d{4}-\d{2}-\d{2}/.test(String(v || '')) ? Date.parse(v) : NaN; return isNaN(t) ? String(v || '') : fmtPub.format(new Date(t)); };
+  // A story's date: a real date as "12 Oct". Some sites give none, and then the news search's own wording ("3 minutes ago",
+  // "2 weeks ago") is all there is: that's counted back from when Market Watch found the story, so it doesn't stay "3 minutes ago".
+  const AGO = { minute: 6e4, hour: 36e5, day: 864e5, week: 6048e5, month: 2592e6, year: 31536e6 };
+  const pubText = (v, seen) => {
+    const s = String(v || '');
+    let t = /^\d{4}-\d{2}-\d{2}/.test(s) ? Date.parse(s) : NaN;
+    const m = isNaN(t) && s.match(/^(\d+|an?)\s+(minute|hour|day|week|month|year)s?\s+ago$/i);
+    if (m && !isNaN(Date.parse(seen))) t = Date.parse(seen) - (/^\d/.test(m[1]) ? +m[1] : 1) * AGO[m[2].toLowerCase()];
+    return isNaN(t) ? s : fmtPub.format(new Date(t));
+  };
   const siteOf = u => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch (e) { return ''; } };
   // No picture, or it won't load: a panel in the story's colour with the publisher's initials.
   const isWin = i => i.kind === 'lead' && !!i.buyer;
@@ -164,7 +173,7 @@
       href ? h('a', { class: 'pic-link', href, target: '_blank', rel: 'noopener', tabindex: '-1', 'aria-hidden': 'true' }, picture(i)) : picture(i),
       h('div', { class: 'body' },
         h('p', { class: 'kicker' }, h('span', { class: 'tag ' + i.kind + (isWin(i) ? ' win' : ''), text: tag }), isNew(i) ? h('span', { class: 'new', text: 'New' }) : null,
-          h('span', { class: 'src', text: [where, pubText(i.published)].filter(Boolean).join(' · ') })),
+          h('span', { class: 'src', text: [where, pubText(i.published, i.firstSeen)].filter(Boolean).join(' · ') })),
         h('h3', { class: 'headline' }, link(i.url, i.title || i.url)),
         isWin(i) ? h('p', { class: 'won' }, h('strong', { text: i.buyer }), [i.area, i.value].filter(Boolean).map(x => ' · ' + x).join('')) : null,
         size !== 'mini' && i.summary ? h('p', { class: 'standfirst', text: i.summary }) : null,
