@@ -2,12 +2,14 @@
    FLR Hub: Market Watch (Hub tile 'market').
 
    What's happening in FLR's market, refreshed without anyone doing anything:
-     - every morning: local news sorted into leads and LinkedIn post ideas (Firecrawl
-       reads each new story and says why it matters), public tenders that mention
-       flooring, and a check of flr.co.uk's counters;
-     - every Monday: what five rival contractors' homepages claim, and what people
-       search for (Google Trends, UK);
-     - on the 3rd of each month: estimated website visits (Similarweb).
+     - every weekday morning: local news sorted into leads and LinkedIn post ideas
+       (Firecrawl reads each new story and says why it matters), and public tenders
+       that mention flooring;
+     - every Monday: a check of flr.co.uk's counters, and what people search for
+       (Google Trends, UK);
+     - on the 3rd of each month: what five rival contractors' homepages claim.
+   Website visits (Similarweb) are switched off to save Firecrawl credits (the
+   user's choice, 2 Nov 2026): the Traffic tab keeps the last figures fetched.
 
    Data: public.market_board() (Estimator repo; app check 'market'), filled by the
    flr-market Edge Function. Until that function is in the database the page shows
@@ -62,7 +64,7 @@
   function closesSoon(s) { const t = Date.parse(s); return !isNaN(t) && t - Date.now() < 14 * 24 * 3600e3 && t > Date.now() - 24 * 3600e3; }
   function closesText(s) { const t = Date.parse(s); return isNaN(t) ? String(s || '') : fmtDay.format(new Date(t)); }
   // How late each refresh may be before the page says so.
-  const LATE = { daily: 30 * 3600e3, weekly: 8 * 24 * 3600e3, monthly: 33 * 24 * 3600e3 };
+  const LATE = { daily: 4 * 24 * 3600e3, weekly: 8 * 24 * 3600e3, monthly: 33 * 24 * 3600e3 };   // daily runs on weekdays only
   function when(part, label) {
     const at = DATA.readAt && DATA.readAt[part] ? new Date(DATA.readAt[part]) : null;
     const late = !DATA.sample && (!at || (DATA.failing && DATA.failing[part]) || (Date.now() - at) > LATE[part]);
@@ -229,8 +231,8 @@
         const rows = DATA.competitors || [];
         const cell = a => (a && a.length) ? a.join(', ') : h('span', { class: 'when', text: 'None on homepage' });
         return [
-          h('h2', { text: 'What rivals’ homepages say' }), when('weekly', '2 November 2026'),
-          h('p', { class: 'note', text: 'Read every Monday from each homepage, in their own words. Inner pages may say more.' }),
+          h('h2', { text: 'What rivals’ homepages say' }), when('monthly', '2 November 2026'),
+          h('p', { class: 'note', text: 'Read on the 3rd of each month from each homepage, in their own words. Inner pages may say more.' }),
           h('div', { class: 'scroll' }, h('table', { class: 'comp' },
             h('thead', {}, h('tr', {}, ['Contractor', 'Headline & claims', 'Sectors', 'Services', 'Named work', 'Brands shown'].map(t => h('th', { text: t })))),
             h('tbody', {}, rows.map(c => h('tr', { class: c.us ? 'us' : null },
@@ -262,8 +264,8 @@
       render() {
         const s = DATA.site || {};
         return [
-          h('h2', { text: 'flr.co.uk check' }), when('daily', '2 November 2026'),
-          h('p', { class: 'note', text: 'Firecrawl reads the live homepage every morning and checks it against the brand guidelines (FLR navy, Eurostile headings).' }),
+          h('h2', { text: 'flr.co.uk check' }), when('weekly', '2 November 2026'),
+          h('p', { class: 'note', text: 'Firecrawl reads the live homepage every Monday and checks it against the brand guidelines (FLR navy, Eurostile headings).' }),
           h('div', { class: 'grid' },
             h('div', { class: 'card' }, h('h3', { text: 'Checks' }), h('ul', { class: 'checks' }, (s.checks || []).map(c => h('li', {}, h('span', { class: c.ok ? 'ok' : 'bad', 'aria-label': c.ok ? 'OK' : 'Needs fixing', text: c.ok ? '✓' : '!' }), h('span', { text: c.text }))))),
             h('div', { class: 'card' }, h('h3', { text: 'Counters as the page shows them' }),
@@ -283,9 +285,9 @@
         const missing = (tr.sites || []).filter(s => s.visits == null).map(s => s.name);
         const month = tr.month ? fmtMonth.format(new Date(tr.month + '-01T00:00:00Z')) : '';
         return [
-          h('h2', { text: 'Estimated website visits' + (month ? ', ' + month : '') }), when('monthly', '2 November 2026'),
-          h('p', { class: 'note', text: 'Similarweb estimates, worldwide, all devices, rounded to the nearest 10. For sites this small they’re rough, so compare them with flr.co.uk’s own analytics. Refreshed on the 3rd of each month.' }),
-          h('div', { class: 'card' }, bars(rows, 'Estimated visits'), missing.length ? h('p', { class: 'when', text: 'No figure this month: ' + missing.join(', ') + '.' }) : null),
+          h('h2', { text: 'Estimated website visits' + (month ? ', ' + month : '') }),
+          h('p', { class: 'note', text: 'Similarweb estimates, worldwide, all devices, rounded to the nearest 10. For sites this small they’re rough, so compare them with flr.co.uk’s own analytics. Refreshing them is switched off for now to save Firecrawl credits (about 660 a month), so these are the last figures fetched.' }),
+          h('div', { class: 'card' }, rows.length ? bars(rows, 'Estimated visits') : h('p', { class: 'when', text: 'No visit figures yet.' }), missing.length ? h('p', { class: 'when', text: 'No figure this month: ' + missing.join(', ') + '.' }) : null),
           DATA.credits && DATA.credits.used != null ? h('p', { class: 'when', text: `Firecrawl credits used by Market Watch in ${DATA.credits.month ? fmtMonth.format(new Date(DATA.credits.month + '-01T00:00:00Z')) : 'this month'}: ${nf.format(DATA.credits.used)}.` }) : null,
         ];
       },

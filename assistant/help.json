@@ -2640,7 +2640,7 @@
         "website traffic",
         "news"
       ],
-      "answer": "Market Watch keeps an eye on FLR’s market. Each morning it gathers local news as leads and LinkedIn post ideas, lists public tenders that mention flooring, and checks flr.co.uk’s counters. Every Monday it reads five rival contractors’ homepages and Google Trends. On the 3rd of each month it adds estimated website visits. Anything found in the last 24 hours is marked New. It starts with FLR Super Admins and the marketing account; to get it, ask an FLR Super Admin.",
+      "answer": "Market Watch keeps an eye on FLR’s market. Every weekday morning it gathers local news as leads and LinkedIn post ideas, each with its picture and a link to the story, and lists public tenders that mention flooring. On Mondays it checks flr.co.uk and Google Trends, and on the 3rd of each month it reads five rival contractors’ homepages. Anything found in the last 24 hours is marked New. It starts with FLR Super Admins and the marketing account; to get it, ask an FLR Super Admin.",
       "link": {
         "tile": "market",
         "label": "Open Market Watch"
@@ -2667,7 +2667,7 @@
         "late",
         "out of date"
       ],
-      "answer": "Market Watch refreshes news, tenders and the flr.co.uk check at 6:30 every morning, competitors and search trends on Mondays, and website visits on the 3rd of each month. Each section says when it was last updated, in red if a refresh didn’t work. If it stays red, tell an FLR Super Admin.",
+      "answer": "Market Watch refreshes news and tenders at 6:30 every weekday morning (7:30 in summer), the flr.co.uk check and search trends on Mondays, and rivals’ websites on the 3rd of each month. Website visits aren’t refreshed for now, to save Firecrawl credits. Each section says when it was last updated, in red if a refresh didn’t work. If it stays red, tell an FLR Super Admin.",
       "link": {
         "tile": "market",
         "label": "Open Market Watch"

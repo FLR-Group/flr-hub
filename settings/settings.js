@@ -375,7 +375,7 @@
     if (id === 'proximity') return 'The nearest surveyor to a site postcode; live vehicle positions for Admins';
     if (id === 'warehouse') return 'Ticks off the warehouse checklist; ticks go to Monday';
     if (id === 'surveyors') return 'Who’s surveying where, from HubSpot, read-only';
-    if (id === 'market') return 'Leads, tenders, competitors and search trends, refreshed every morning';
+    if (id === 'market') return 'Leads, tenders, competitors and search trends, refreshed every weekday';
     if (['outlook', 'monday', 'hubspot', 'sharepoint'].includes(id)) return 'Shows it on their Hub. The website has its own sign-in';
     if (id === 'estimator') return a.role === 'admin' ? 'Everything, including prices and rules' : a.role === 'manager' ? 'Builds, approves and reassigns quotes' : a.role === 'developer' ? 'Reads and exports quotes' : 'Builds and approves quotes';
     return '';
