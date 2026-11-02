@@ -18,6 +18,9 @@
   // Estimator. Since then the Estimator is a tile like the others, for the accounts that have it.
   const ESTIMATOR = { id: 'estimator', title: 'Cost Estimator', subtitle: 'Price commercial flooring jobs and build quotes.', url: 'estimator/' };
   const ICONS = { estimator: 'i-estimator', speeding: 'i-speeding', 'annual-leave': 'i-leave', fitters: 'i-fitters', onboarding: 'i-onboarding', orders: 'i-orders', capacity: 'i-capacity', proximity: 'i-proximity', warehouse: 'i-warehouse', surveyors: 'i-surveyors', maintenance: 'i-maintenance', market: 'i-market' };
+  // Super Admins' less-used apps share one folder on the home screen, as on an iPhone. Everyone else sees these apps as
+  // ordinary tiles (Maintenance is everyone's). A folder only appears when two or more of its apps are someone's.
+  const FOLDERS = [{ id: 'operations', name: 'Operations', apps: ['maintenance', 'market', 'warehouse'] }];
   const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
   const strongEnough = p => p.length >= 10 && /[A-Za-z]/.test(p) && /\d/.test(p);
   const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -322,6 +325,67 @@
   document.addEventListener('keydown', e => { if (e.key === 'Escape') { hideTips(); tilesEl.querySelectorAll('.tile').forEach(li => li.classList.add('tip-off')); } });
   tilesEl.addEventListener('pointerout', e => { const li = e.target.closest('.tile'); if (li && !li.contains(e.relatedTarget)) li.classList.remove('tip-off'); });
   tilesEl.addEventListener('focusout', e => { const li = e.target.closest('.tile'); if (li) li.classList.remove('tip-off'); });
+  /* ---------------------------------------------------------------- folders (Super Admins): a tap opens one over the home screen */
+  // The folder takes the place of its first app in the list; inside, its apps keep the folder's own order.
+  function foldApps(list) {
+    const out = list.slice();
+    for (const f of FOLDERS) {
+      const apps = f.apps.map(id => out.find(t => !t.folder && t.id === id)).filter(Boolean);
+      if (apps.length < 2) continue;
+      const at = out.indexOf(apps.find(t => out.indexOf(t) === Math.min(...apps.map(a => out.indexOf(a)))));
+      out.splice(at, 1, { folder: f, apps });
+      for (const t of apps) { const i = out.indexOf(t); if (i >= 0) out.splice(i, 1); }
+    }
+    return out;
+  }
+  function folderEl(f, apps) {
+    const li = el('li', 'tile tile--folder'); li.dataset.id = 'folder-' + f.id;
+    const b = el('button', 'tile-link'); b.type = 'button';
+    b.setAttribute('aria-haspopup', 'dialog');
+    b.setAttribute('aria-label', `${f.name} folder: ${apps.map(t => t.title).join(', ')}`);
+    const icon = el('span', 'app-icon folder-icon'); icon.setAttribute('aria-hidden', 'true');
+    for (const t of apps.slice(0, 9)) icon.append(tileEl(t).querySelector('.app-icon'));
+    b.append(icon, el('span', 'tile-name', f.name));
+    b.addEventListener('click', () => openFolder(f, apps, icon));
+    li.append(b);
+    return li;
+  }
+  // It grows out of the folder's icon and shrinks back into it, as on an iPhone; the backdrop, Escape or Close shut it.
+  let folderFrom = null, folderClosing = false;
+  const folderMorph = () => {
+    const panel = $('#folder .folder-panel'), r = folderFrom && folderFrom.isConnected ? folderFrom.getBoundingClientRect() : null;
+    if (!r || !r.width) return null;
+    const p = panel.getBoundingClientRect();
+    return `translate(${r.left + r.width / 2 - (p.left + p.width / 2)}px,${r.top + r.height / 2 - (p.top + p.height / 2)}px) scale(${r.width / p.width})`;
+  };
+  function openFolder(f, apps, icon) {
+    const dlg = $('#folder');
+    $('#folder-title').textContent = f.name;
+    $('#folder-tiles').replaceChildren(...apps.map(t => tileEl(t)));
+    folderFrom = icon; folderClosing = false;
+    dlg.showModal(); root.classList.add('sheet-open');
+    $('#folder .folder-panel').focus({ preventScroll: true });
+    $('#folder-tiles').querySelectorAll('.tile').forEach(placeTip);
+    if (reduced()) return;
+    const from = folderMorph(), ease = 'cubic-bezier(.2,.9,.25,1)';
+    $('#folder .folder-panel').animate(from ? [{ transform: from, opacity: .3 }, { transform: 'none', opacity: 1 }] : [{ opacity: 0 }, { opacity: 1 }], { duration: 420, easing: ease });
+    $('#folder .folder-scrim').animate([{ opacity: 0 }, { opacity: 1 }], { duration: 300, easing: 'ease' });
+  }
+  function closeFolder(o = {}) {
+    const dlg = $('#folder');
+    if (!dlg.open || folderClosing) return;
+    const done = () => { folderClosing = false; dlg.close(); if (!document.querySelector('dialog[open]')) root.classList.remove('sheet-open'); };
+    const from = !o.instant && !reduced() && folderMorph();
+    if (!from) { done(); return; }
+    folderClosing = true;
+    $('#folder .folder-panel').animate([{ transform: 'none', opacity: 1 }, { transform: from, opacity: 0 }], { duration: 320, easing: 'cubic-bezier(.4,0,.6,1)', fill: 'forwards' })
+      .onfinish = e => { done(); e.target.cancel(); };
+    $('#folder .folder-scrim').animate([{ opacity: 1 }, { opacity: 0 }], { duration: 320, easing: 'ease', fill: 'forwards' }).onfinish = e => e.target.cancel();
+  }
+  $('#folder').addEventListener('cancel', e => { e.preventDefault(); closeFolder(); });
+  $('#folder').addEventListener('click', e => { if (e.target === e.currentTarget || e.target.closest('.folder-scrim,[data-close]')) closeFolder(); });
+  addEventListener('pageshow', e => { if (e.persisted) closeFolder({ instant: true }); });   // back from a tool: the home screen, not the open folder
+
   function renderHome(home, o = {}) {
     const name = (home && home.name) || '';
     const first = name.trim().split(/\s+/)[0] || '';
@@ -346,9 +410,12 @@
     const tiles = [];
     if (o.loading) tiles.push(tileEl(null, { loading: true }), tileEl(null, { loading: true }));
     else {
-      if (home && home.tiles && !home.apps) tiles.push(tileEl(ESTIMATOR));
-      for (const t of (home && home.tiles) || []) if (safeTile(t)) tiles.push(tileEl(t));
+      const list = [];
+      if (home && home.tiles && !home.apps) list.push(ESTIMATOR);
+      for (const t of (home && home.tiles) || []) if (safeTile(t)) list.push(t);
+      for (const x of home && home.role === 'admin' ? foldApps(list) : list) tiles.push(x.folder ? folderEl(x.folder, x.apps) : tileEl(x));
     }
+    if ($('#folder').open) closeFolder({ instant: true });
     $('#tiles').replaceChildren(...tiles);
     // A quiet way into Maintenance's report form, for the people who have the Maintenance tile.
     $('#maint-shortcut').hidden = !!o.loading || waiting || !((home && home.tiles) || []).some(t => t && t.id === 'maintenance' && safeTile(t));
