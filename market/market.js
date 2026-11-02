@@ -220,7 +220,7 @@
         const rows = items('tender').slice().sort((a, b) => (b.local ? 1 : 0) - (a.local ? 1 : 0) || (Date.parse(a.closes) || 9e15) - (Date.parse(b.closes) || 9e15));
         return [
           h('h2', { text: 'Public tenders' }), when('daily', '2 November 2026'),
-          h('p', { class: 'note', text: 'Open notices from Find a Tender and Contracts Finder. Firecrawl reads each new one and keeps it only if FLR could bid for it or win its flooring. Local ones first, then soonest closing.' }),
+          h('p', { class: 'note', text: 'Open Find a Tender notices that mention flooring. Firecrawl reads each new one and keeps it only if FLR could bid for it or win its flooring. Local ones first, then soonest closing. Contracts Finder can’t be read from the FLR server, so its notices come by its own email alert.' }),
           list(rows, 'No open tenders mention flooring right now.'),
         ];
       },
