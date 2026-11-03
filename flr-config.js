@@ -7,6 +7,6 @@ window.FLR_CONFIG = {
   supabaseAnonKey: "sb_publishable_B38pIzkqOb3znR13Q1z_9g_oILllfX2",
 };
 // Fleet Management map tiles (satellite and streets) from Esri. A public "API key" meant for web pages: Esri only
-// accepts it from flrmarketing.github.io (referrer restriction) and it can only load basemaps. Item "FLR Hub map" in
+// accepts it from hub.flr.co.uk, flr-group.github.io and flrmarketing.github.io (referrer restriction) and it can only load basemaps. Item "FLR Hub map" in
 // the flrgroup.maps.arcgis.com ArcGIS Location Platform account; it expires about Oct 2027.
-window.FLR_MAP_KEY = "AAPTa85vHPKB2VDyBO_kY3zrnaw..h1m9adQNvEF6UStM4YDIgz6_OOqfKo1sbcox1YML7TZcfjbLp5-uHWOy79e2bg3b_QewNvYEi-qBfdxxx3UE1VIm7mQv5XUk_P42y9LmqMVboK6g9mksu7bXpZlFBQqzKVMr_l92UiplWQYKz9146fn1u5p3Ospkj8M60R4N0I0DJw_jMX0spo9ETM1KruHZf9WA4gyJC-b4S-eBXPKcrqhGLwBq2drvwepzv9Uvt9pTnUnL9RoX1kl53YREVQo.AT1_SYWlkZt1";
+window.FLR_MAP_KEY = "AAPTayYbgpOHHDF40f2npJG05nQ..nanTMzxCV-eRIWc58CVrn9-Zm3PxtPO-7QtNbDB9ukNpyi__TFEJ2ceAw5Ve4BXNvpLio6W1iFpHv1y0M8TnR_FRk6hWbfvM5OTLPX5L0Tt5hfKHAvXnOTlG25XrEGaPKYQSUrrsFCFYHE9vJtYyOxY-Ubj62uhaR9kgna8SrhiYrmn_DbvLBSdtIf6JgP5NYpanjr-aid_Ra8M3ZbFj3I-XZzS4iMnbyPkah1Sj3J7LXDdX6mEkMjB6vNoC8qI.AT1_SYWlkZt1";
