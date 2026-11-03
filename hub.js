@@ -194,10 +194,12 @@
       if (/weak|Password should|password/i.test(m)) return 'The password does not meet the requirements.';
       if (/invalid.*email|email.*invalid|validation_failed/i.test(m)) return 'Enter a valid email address.';
     }
+    if (context === 'update' && /session.missing|session_not_found/i.test(m)) return LINK_GONE;
     if (context === 'update' && /same_password|different from the old/i.test(m)) return 'Choose a password you have not used before.';
     if (context === 'update' && /weak|Password should|password/i.test(m)) return 'The new password does not meet the requirements.';
     return m || 'Something went wrong. Try again.';
   }
+  const LINK_GONE = 'This reset link has already been used or has expired. Enter your email to get a new one.';
   const flrCode = e => { const m = /FLR_[A-Z_]+/.exec(e ? `${e.message || ''} ${e.details || ''}` : ''); return m ? m[0] : ''; };
   const missingFunction = e => !!e && (e.code === 'PGRST202' || e.code === '42883' || /could not find the function/i.test(e.message || ''));
   const offline = e => !!e && /Failed to fetch|NetworkError|Load failed|fetch failed/i.test(e.message || '');
@@ -734,6 +736,34 @@
     $('#forgot-ok').hidden = false;
   });
 
+  /* ---------------------------------------------------------------- reset links
+     The reset email links to this page with ?reset_token=… (Supabase's "Reset password" email template), and the
+     one-time link is only used when the person presses Save password. Outlook's link scanner opens every link in an
+     email before people do, and that used up the older links, which spent themselves as soon as they were opened. */
+  let resetToken = null;   // the token from the link, until it has been used; '' = a link that can't work
+  function readResetLink() {
+    const q = new URLSearchParams(location.search), h = new URLSearchParams(location.hash.slice(1));
+    if (q.has('reset_token')) {
+      const t = q.get('reset_token') || ''; q.delete('reset_token');
+      resetToken = /^[A-Za-z0-9_-]{8,200}$/.test(t) ? t : '';
+    } else if (/otp_expired|access_denied/.test(h.get('error_code') || h.get('error') || '')) {
+      resetToken = '';   // an older link (from before this change) that had already been used
+    } else return;
+    history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : ''));   // the token never stays in the address bar
+  }
+  function offerReset() {
+    if (resetToken === null) return;
+    if (!resetToken) { linkGone(); return; }
+    $('#rc-lede').hidden = false;
+    sheets.open('sheet-recover');
+  }
+  function linkGone() {
+    resetToken = null;
+    sheets.close($('#sheet-recover'), { instant: true });
+    sheets.open('sheet-forgot');
+    formError('#forgot-error', LINK_GONE);
+  }
+
   $('#recover-form').addEventListener('submit', async e => {
     e.preventDefault();
     const form = e.currentTarget, btn = submitBtn(form);
@@ -742,13 +772,23 @@
     if (!strongEnough(p)) { formError('#recover-error', 'Use at least 10 characters, with letters and numbers.'); $('#rc-password').focus(); return; }
     if (p !== again) { formError('#recover-error', 'The two passwords don’t match.'); $('#rc-confirm').focus(); return; }
     formError('#recover-error', ''); busy(btn, true, 'Saving…');
+    const fromLink = !!resetToken;
+    if (fromLink) {   // only now is the link used, and it signs this person in so the new password can be saved
+      const v = await client().auth.verifyOtp({ token_hash: resetToken, type: 'recovery' });
+      if (v.error) { busy(btn, false); if (offline(v.error)) { formError('#recover-error', describeAuthError(v.error, 'update')); return; } linkGone(); return; }
+      resetToken = null;
+    }
     const { error } = await client().auth.updateUser({ password: p });
     busy(btn, false);
-    if (error) { formError('#recover-error', describeAuthError(error, 'update')); return; }
-    form.reset();
+    if (error) {
+      const msg = describeAuthError(error, 'update');
+      if (msg === LINK_GONE) { linkGone(); return; }
+      formError('#recover-error', msg); return;
+    }
+    form.reset(); $('#rc-lede').hidden = true;
     sheets.close($('#sheet-recover'));
     toast('Password changed');
-    if (current !== 'home') loadHome({ animate: true });
+    if (current !== 'home' || fromLink) loadHome({ animate: true });
   });
 
   $('#account-btn').addEventListener('click', () => sheets.open('sheet-account'));
@@ -792,6 +832,7 @@
 
   /* ---------------------------------------------------------------- start */
   async function boot() {
+    readResetLink();   // before the sign-in library looks at the address
     const c = client();
     if (!c) return show('setup');
     const stored = !!store.get(AUTH_KEY);
@@ -803,9 +844,9 @@
     });
     let session = null;
     try { session = (await c.auth.getSession()).data.session; } catch (e) { /* treated as signed out */ }
-    if (session) return loadHome();
-    store.del(NAME_KEY);
-    return show('signin', { animate: stored });
+    if (session) await loadHome();
+    else { store.del(NAME_KEY); await show('signin', { animate: stored }); }
+    offerReset();
   }
   boot();
 })();

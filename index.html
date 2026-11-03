@@ -18,7 +18,7 @@
 <script src="flr-config.js"></script>
 <script src="web-apps.js?v=2.0"></script>
 <script src="vendor/supabase-2.116.0.js" defer></script>
-<script src="hub.js?v=3.1" defer></script>
+<script src="hub.js?v=3.2" defer></script>
 <script type="module" src="assistant/assistant.js?v=2.4"></script>
 </head>
 <body data-view="boot">
@@ -241,6 +241,7 @@
   <div class="panel">
     <div class="sheet-head"><span class="grabber" aria-hidden="true"></span><h2 class="sheet-title" id="recover-title">Choose a new password</h2><button class="close" type="button" data-close aria-label="Close"><svg aria-hidden="true"><use href="#i-close"/></svg></button></div>
     <form class="form sheet-body" id="recover-form" novalidate>
+      <p class="sheet-lede" id="rc-lede" hidden>Choose a new password for your FLR account. It’s saved when you press Save password.</p>
       <div class="group">
         <label class="row" for="rc-password"><span class="row-label">New</span><input id="rc-password" name="password" type="password" autocomplete="new-password" placeholder="Required" required aria-describedby="rc-hint"></label>
         <label class="row" for="rc-confirm"><span class="row-label">Confirm</span><input id="rc-confirm" name="confirm" type="password" autocomplete="new-password" placeholder="Type it again" required></label>
