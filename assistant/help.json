@@ -2596,7 +2596,9 @@
         "add someone to handle maintenance",
         "who handles IT problems",
         "how do I add a known issue",
-        "to handle tab"
+        "to handle tab",
+        "switch off maintenance for someone",
+        "turn off maintenance for a person"
       ],
       "keys": [
         "handler",
@@ -2609,7 +2611,7 @@
         "category",
         "maintenance"
       ],
-      "answer": "Only you and the people handling your report can see it. Each category is handled by the people a Super Admin names under Who handles what, and by Super Admins. Handlers use the To handle tab to update a report, ask for more information or mark it resolved, and write the Known issues, which everyone sees, so they never name anyone.",
+      "answer": "Only you and the people handling your report can see it. Each category is handled by the people a Super Admin names under Who handles what, and by Super Admins. Handlers use the To handle tab to update a report, ask for more information or mark it resolved, and write the Known issues, which everyone sees, so they never name anyone. A Super Admin can switch Maintenance on or off for someone in Hub settings.",
       "link": {
         "tile": "maintenance",
         "label": "Open Maintenance"

@@ -24,7 +24,7 @@
 import { buildIndex, search, searchSlots, maybes, hubWords, properNames, unaddressed } from './engine.js?v=2.2';
 import { pickLine, moodFor, sourceLine, CAN_DO } from './lines.js?v=2.2';
 
-const V = '2.4';
+const V = '2.5';
 const HERE = new URL('.', import.meta.url);
 const HUB = new URL('../', HERE);
 const AUTH_KEY = 'flr-estimator-auth';                 // the FLR sign-in every Hub page shares
