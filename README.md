@@ -276,8 +276,8 @@ instead of guessing. It never reads leave, quotes or driver data and changes not
   no wrong answers and none answered that should have been declined. `heldout.json` was written by someone who never
   saw the help text; `--sweep` shows other thresholds.
 - Pages load it with `<script type="module" src="(../)assistant/assistant.js?v=2.1"></script>`: `index.html` directly,
-  and the tools through their build scripts. The Fitter Schedule (FLRMarketing/fitter-schedule) loads
-  `/flr-hub/assistant/assistant.js` from the head that `flr-fitter-schedule/dev/assemble.py` writes. On a release, bump
+  and the tools through their build scripts. The Fitter Schedule (`fitter-schedule/`, here since 6 Nov 2026 so it shares the Hub's sign-in) loads
+  `../assistant/assistant.js` from the head that `flr-fitter-schedule/dev/assemble.py` writes. On a release, bump
   `?v=` in all five and in `assistant.js` (`V` and the `engine.js` and `lines.js` imports).
 - When a tool changes its buttons or wording, update its answers here too.
 - It also answers from everything the person can see in their tools, read-only (`assistant/records.js`), and nothing
