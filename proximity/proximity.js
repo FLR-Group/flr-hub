@@ -528,12 +528,12 @@
     const pts = [[site.lat, site.lon]];
     if (MODE === 'home') {
       // Where the nearest fitters live: their photo with a small house, on the exact house once it's found
-      (homes || []).slice(0, 12).forEach((x, i) => {
+      (homes || []).forEach(x => {   // everyone, not only the nearest
         const m = L.marker([x.at.lat, x.at.lon], { icon: L.divIcon({ className: 'jobmark homemark', html: h('div', null, face(x.name, 'sm'), h('span', { class: 'hbadge' }, icon('i-home'))), iconSize: [0, 0] }), title: x.name }).addTo(M.layer);
         m.bindTooltip(`${x.name} · home${x.exact ? '' : ' (postcode)'} · ${milesTxt(x.d)} · ${timeTxt(x.d)}`, { className: 'vt', direction: 'top', offset: [0, -20] });
         m.on('click', () => pickHome(x.name, false));
         M.marks.set(`h:${x.name}`, { m, h: x });
-        if (i < 4) pts.push([x.at.lat, x.at.lon]);
+        pts.push([x.at.lat, x.at.lon]);
       });
     } else if (MODE === 'live' && DATA.vansAllowed) {
       list.forEach((v, i) => {
@@ -664,7 +664,7 @@
           h('button', { type: 'button', class: 'mp-first', 'data-home': top.name, title: 'Show on the map' },
             person(top.name, null, h('span', { class: 'addr' }, homeLine(top)), 'lg'),
             h('span', { class: 'far' }, farLine(top.d), top.exact ? null : ' · from the postcode')),
-          h('ul', { class: 'mp-list', 'aria-label': 'Next nearest homes' }, rest.slice(0, 12).map(x => h('li', null,
+          h('ul', { class: 'mp-list', 'aria-label': 'Next nearest homes' }, rest.map(x => h('li', null,
             h('button', { type: 'button', class: 'mp-row', 'data-home': x.name },
               person(x.name, null, h('span', { class: 'addr' }, homeLine(x)), 'sm'),
               h('span', { class: 'mi' }, milesTxt(x.d), h('span', null, timeTxt(x.d)))))))
@@ -721,9 +721,8 @@
     // Road routes for what's on screen only
     const want = [];
     if (MODE === 'home') {
-      const near = homes.slice(0, 8);
-      placeHomes(near);
-      for (const x of near) if (settled(x)) want.push([x.at, site, false]);   // once the exact house is known (or can't be)
+      placeHomes(homes);   // every pin on its exact house (each looked up once per page)
+      for (const x of homes.slice(0, 8)) if (settled(x)) want.push([x.at, site, false]);   // road routes: the nearest 8   // once the exact house is known (or can't be)
     } else if (MODE === 'booked') {
       for (const b of todays.slice(0, 6)) want.push([b.pos, site, false]);
       for (let i = 1; i <= DAYS_AHEAD; i++) for (const b of nearestOn(addDays(TODAY, i), site).slice(0, 3)) want.push([b.pos, site, false]);
