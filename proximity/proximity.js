@@ -130,8 +130,31 @@
   }
   const slug = n => String(n || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   let PHOTOS = {};
+  // The photo for a name: its own, else the one filed under the short name used on the Work Programme, so Team Details'
+  // "Daniel Byrne" finds dan-byrne, "James Foxall" jim-foxall, "Kai Spink-Lingen" kai-lingen, "James O'Donnell" james-o.
+  // Same first initial and surname (or a part of a double-barrelled one); only when exactly one photo fits.
+  const PHOTO_FOR = new Map();
+  function photoKey(name) {
+    const k = slug(name);
+    if (PHOTOS[k]) return k;
+    if (PHOTO_FOR.has(k)) return PHOTO_FOR.get(k);
+    const words = String(name || '').toLowerCase().replace(/['’]/g, '').split(/\s+/).filter(Boolean);
+    let found = null;
+    if (words.length > 1) {
+      const first = slug(words[0]), sur = words[words.length - 1], whole = slug(sur).replace(/-/g, '');
+      const variants = [whole, ...sur.split('-').map(slug)].filter(Boolean);
+      const fits = Object.keys(PHOTOS).filter(key => {
+        const ks = key.split('-'), kf = ks[0], kl = ks.slice(1).join('');
+        if (!kl || kf[0] !== first[0]) return false;
+        return variants.includes(kl) || (kf === first && kl.length <= 2 && whole.startsWith(kl));
+      });
+      if (fits.length === 1) found = fits[0];
+    }
+    if (Object.keys(PHOTOS).length) PHOTO_FOR.set(k, found);
+    return found;
+  }
   function face(name, cls) {
-    const src = PHOTOS[slug(name)];
+    const key = photoKey(name), src = key ? PHOTOS[key] : null;
     if (src && /^data:image\//.test(src)) return h('img', { class: `face ${cls || ''}`, src, alt: '' });
     const s = document.createElementNS(SVG, 'svg');
     s.setAttribute('class', `face ${cls || ''}`); s.setAttribute('viewBox', '0 0 48 48'); s.setAttribute('aria-hidden', 'true');
