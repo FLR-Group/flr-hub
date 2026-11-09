@@ -65,7 +65,7 @@
   const S = { you: '', apps: [], accounts: [], settings: null, pre: [], query: '',
     // People & access: which view, who or which app is open, and the drafts (account id -> { role, status, apps: { app: on } }),
     // kept until Save changes. Nothing in a draft has reached the database.
-    mode: 'people', person: '', app: '', open: false, draft: new Map(), saving: false, error: '', saved: '',
+    mode: 'people', person: '', app: '', open: false, draft: new Map(), saving: false, error: '', saved: '', canRename: false,
     photos: {},
     // Teams (Hub migration 2.8): null until the database has them (the Teams tab stays hidden); drafts as for accounts.
     teams: null, team: '', teamFilter: '', tdraft: new Map(), newSeq: 0 };   // account id -> staff photo (Hub migration 2.5); none, initials
@@ -139,25 +139,31 @@
   function shown(a) {
     const d = S.draft.get(a.id), apps = new Set(a.apps);
     if (d) for (const [id, on] of Object.entries(d.apps)) { if (on) apps.add(id); else apps.delete(id); }
-    return { role: d && d.role !== undefined ? d.role : a.role, status: d && d.status !== undefined ? d.status : a.status, apps };
+    return { role: d && d.role !== undefined ? d.role : a.role, status: d && d.status !== undefined ? d.status : a.status, apps,
+      name: d && d.name !== undefined ? d.name : (a.name || '') };
   }
+  // Names (Hub migration 3.0): spaces tidied the way the database tidies them, so "Ben  Wright " is no change.
+  const tidyName = v => String(v || '').replace(/\s+/g, ' ').trim();
+  const isEmptyDraft = d => d.role === undefined && d.status === undefined && d.name === undefined && !Object.keys(d.apps).length;
   // One change to the draft. A change back to what the database has isn't a change any more.
-  function edit(a, what) {
+  function edit(a, what, o = {}) {
     if (!a || notApproved(a) || S.saving) return;
     const d = S.draft.get(a.id) || { apps: {} };
+    if ('name' in what) { if (tidyName(what.name) === tidyName(a.name)) delete d.name; else d.name = what.name; }
     if ('role' in what) { if (what.role === a.role) delete d.role; else d.role = what.role; }
     if ('status' in what) { if (what.status === a.status) delete d.status; else d.status = what.status; }
     if ('app' in what) { if (what.on === a.apps.includes(what.app)) delete d.apps[what.app]; else d.apps[what.app] = what.on; }
-    if (d.role === undefined && d.status === undefined && !Object.keys(d.apps).length) S.draft.delete(a.id); else S.draft.set(a.id, d);
+    if (isEmptyDraft(d)) S.draft.delete(a.id); else S.draft.set(a.id, d);
     S.error = ''; S.saved = '';
-    render();
+    render(o);
   }
-  // Every unsaved change, in the order Save sends them: per person, the role, then on or off, then their apps.
+  // Every unsaved change, in the order Save sends them: per person, the name, the role, then on or off, then their apps.
   function changes() {
     const out = [];
     for (const a of listed()) {
       const d = S.draft.get(a.id);
       if (!d) continue;
+      if (d.name !== undefined) out.push({ a, kind: 'name', value: tidyName(d.name), from: a.name });
       if (d.role !== undefined) out.push({ a, kind: 'role', value: d.role, from: a.role });
       if (d.status !== undefined) out.push({ a, kind: 'status', value: d.status, from: a.status });
       for (const app of S.apps) if (app.id in d.apps) out.push({ a, kind: 'app', app: app.id, value: d.apps[app.id] });
@@ -170,12 +176,13 @@
     let gone = 0;
     for (const [id, d] of [...S.draft]) {
       const a = byId(id);
-      const n = (d.role !== undefined) + (d.status !== undefined) + Object.keys(d.apps).length;
+      const n = (d.role !== undefined) + (d.status !== undefined) + (d.name !== undefined) + Object.keys(d.apps).length;
       if (!a || a.waiting || notApproved(a)) { S.draft.delete(id); gone += n; continue; }
       if (d.role === a.role) delete d.role;
       if (d.status === a.status) delete d.status;
+      if (d.name !== undefined && tidyName(d.name) === tidyName(a.name)) delete d.name;
       for (const [app, on] of Object.entries(d.apps)) if (on === a.apps.includes(app) || !S.apps.some(x => x.id === app)) delete d.apps[app];
-      if (d.role === undefined && d.status === undefined && !Object.keys(d.apps).length) S.draft.delete(id);
+      if (isEmptyDraft(d)) S.draft.delete(id);
     }
     return gone;
   }
@@ -400,6 +407,13 @@
       const go = el('button', 'pa-btn', 'Check and approve'); go.type = 'button'; go.dataset.approve = a.id;
       lock.append(go);
       box.append(lock);
+    }
+    if (S.canRename && !off) {   // Hub migration 3.0
+      const nameF = el('label', 'pa-field pa-wide pa-name-field' + (d.name !== undefined ? ' is-changed' : '')); nameF.append(el('span', 'pa-label', 'Name'));
+      const ni = el('input', 'pa-input'); ni.id = 'pa-person-name'; ni.dataset.focus = `name:${a.id}`; ni.maxLength = 80; ni.value = sh.name;
+      ni.autocomplete = 'off'; ni.spellcheck = false; ni.placeholder = 'First and last name';
+      nameF.append(ni);
+      box.append(nameF);
     }
     const fields = el('div', 'pa-fields');
     fields.append(
@@ -727,13 +741,20 @@
     }
     $('#gate').hidden = true;
     $('#accounts-section').hidden = false; $('#registration-section').hidden = false; $('#jeff-section').hidden = false;
-    renderSettings(); renderAccounts(); renderPre(); loadJeff(); loadPhotos(); loadTeams(); loadActivity(true);
+    renderSettings(); renderAccounts(); renderPre(); loadJeff(); loadPhotos(); loadTeams(); loadRenaming(); loadActivity(true);
     view('ready');
   }
   // Staff photos (Hub migration 2.5). Before that update, or if it fails, everyone keeps their initials.
   async function loadPhotos() {
     try { const p = await call('admin_account_photos'); S.photos = p && typeof p === 'object' && !Array.isArray(p) ? p : {}; }
     catch (e) { return; }
+    render();
+  }
+  // Names (Hub migration 3.0). Asked with an empty name, which the database refuses before looking at anything, so
+  // this only learns whether the update is there; before it, the Name box stays hidden.
+  async function loadRenaming() {
+    try { await call('admin_set_name', { p_user: null, p_name: '' }); S.canRename = true; }
+    catch (e) { S.canRename = flrCode(e) === 'FLR_VALIDATION'; }
     render();
   }
   // Teams (Hub migration 2.8). Before that update the Teams tab and chips stay hidden.
@@ -916,6 +937,11 @@
   $('#pa-grid').addEventListener('input', e => {
     if (e.target.id === 'pa-team-name') { editTeam(S.team, { name: e.target.value.replace(/\s+/g, ' ').trimStart() }, { keepDetail: true }); const h = $('#pa-detail-title'); if (h) h.textContent = e.target.value.trim() || 'New team'; }
     if (e.target.id === 'pa-team-desc') editTeam(S.team, { description: e.target.value }, { keepDetail: true });
+    if (e.target.id === 'pa-person-name') {   // the list and the Save bar follow as someone types; the title shows the new name
+      edit(byId(S.person), { name: e.target.value }, { keepDetail: true });
+      e.target.closest('.pa-field').classList.toggle('is-changed', S.draft.has(S.person) && S.draft.get(S.person).name !== undefined);
+      const h = $('#pa-detail-title'); if (h) h.textContent = tidyName(e.target.value) || nameOf(byId(S.person));
+    }
   });
   $('#pa-grid').addEventListener('keydown', e => {   // the colours: arrows move between them, as in any radio group
     const sw = e.target.closest('[data-colour]');
@@ -1001,6 +1027,7 @@
   }
   async function reloadTeams() { if (S.teams) { S.teams = await call('admin_teams'); pruneTeams(); } }
   async function send(c) {
+    if (c.kind === 'name') { const row = await call('admin_set_name', { p_user: c.a.id, p_name: c.value }); const i = S.accounts.findIndex(x => x.id === c.a.id); if (row && i >= 0) S.accounts[i] = row; return; }
     if (c.kind === 'role') { await call('admin_set_role', { p_user: c.a.id, p_role: c.value }); const a = byId(c.a.id); if (a) a.role = c.value; return; }
     if (c.kind === 'status') { await call('admin_set_status', { p_user: c.a.id, p_status: c.value }); const a = byId(c.a.id); if (a) a.status = c.value; return; }
     const row = await call('admin_set_app_access', { p_user: c.a.id, p_app: c.app, p_allowed: c.value });
@@ -1010,6 +1037,10 @@
   async function save() {
     const list = changes(), tops = teamOps(), total = dirty();
     if (!total || S.saving) return;
+    for (const c of list) if (c.kind === 'name' && (c.value.length < 2 || /[<>]/.test(c.value))) {
+      S.mode = 'people'; S.person = c.a.id; S.error = `Give ${c.from || c.a.email} a name of at least 2 letters (no < or >) before saving.`;
+      render(); openDetail(); const n = $('#pa-person-name'); if (n) n.focus(); return;
+    }
     for (const o of tops) if ((o.kind === 'team-new' || o.kind === 'team-details') && !o.t.name.trim()) {
       S.team = o.id; S.mode = 'teams'; S.error = 'Give the team a name before saving.'; render(); const n = $('#pa-team-name'); if (n) n.focus(); return;
     }

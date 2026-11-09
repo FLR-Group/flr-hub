@@ -150,6 +150,8 @@ body:not([data-view="loading"]) .gate-loading{display:none}
 .pa-select::after{content:"";position:absolute;right:12px;top:50%;width:6px;height:6px;margin-top:-5px;border:solid var(--pa-muted);border-width:0 1.8px 1.8px 0;transform:rotate(45deg);pointer-events:none}
 .pa-select select:disabled{color:var(--pa-muted);background:var(--pa-soft);cursor:not-allowed}
 .pa-select.is-changed select{border-color:var(--pa-blue);box-shadow:0 0 0 1px var(--pa-blue)}
+.pa-field.is-changed .pa-input{border-color:var(--pa-blue);box-shadow:0 0 0 1px var(--pa-blue)}
+.pa-name-field{margin-bottom:14px}
 .pa-note{margin:0;color:var(--pa-muted);font-size:12px;line-height:1.45}
 .pa-fields + .pa-note{padding-bottom:16px;border-bottom:1px solid var(--pa-line)}
 .pa-lock{margin:0 0 16px;padding:10px 12px;border-radius:10px;background:var(--pa-soft);color:var(--pa-muted);font-size:12.5px;line-height:1.45}

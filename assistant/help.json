@@ -343,7 +343,9 @@
         "send someone else a password reset",
         "where are the hub settings",
         "which apps does a new account get",
-        "change which apps a person can use"
+        "change which apps a person can use",
+        "change someone else's name",
+        "rename a member of staff"
       ],
       "keys": [
         "settings",
@@ -352,7 +354,7 @@
         "registration",
         "leaver"
       ],
-      "answer": "FLR Super Admins look after every account in Hub settings: the gear beside your initials on the Hub. New accounts wait under “New accounts waiting” until you’ve checked who they are. Under “People & access”, pick a person to change their role, status, apps or password, or choose “By app”. Nothing changes until you press Save changes. Registration, the access code and what new accounts get are under “Registration”.",
+      "answer": "FLR Super Admins look after every account in Hub settings: the gear by your initials on the Hub. New accounts wait under “New accounts waiting” until you’ve checked who they are. Under “People & access”, pick a person to change their name, role, status, apps or password, or choose “By app”. Nothing changes until you press Save changes. Registration, the access code and what new accounts get are under “Registration”.",
       "link": {
         "href": "settings/",
         "label": "Open Hub settings"
