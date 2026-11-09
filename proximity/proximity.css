@@ -302,3 +302,18 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none}
 .clear{height:44px;padding:0 18px;border:0;border-radius:999px;background:var(--fill);color:var(--ink);font-weight:600;font-size:16px;cursor:pointer}
 @media (hover:hover){.clear:hover{background:var(--fill-2)}}
 .site{margin-top:4px}
+
+/* Nearby 1.3: Live / Booked / Home after a search, and fitters' homes on the map */
+.modes{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:4px;margin:0 0 14px;border-radius:14px;background:var(--fill)}
+.modes[hidden]{display:none}
+.modes button{display:grid;gap:2px;justify-items:center;padding:9px 8px;border:0;border-radius:10px;background:transparent;color:var(--ink);font:inherit;cursor:pointer;transition:background-color .2s,box-shadow .2s}
+.modes .m-t{font:650 15.5px/1.15 var(--font-text)}
+.modes .m-s{font-size:12.5px;line-height:1.2;color:var(--ink-2);text-align:center}
+.modes button[aria-pressed="true"]{background:var(--tint-fill);color:var(--on-tint);box-shadow:0 1px 3px rgba(0,0,0,.18)}
+.modes button[aria-pressed="true"] .m-s{color:inherit;opacity:.85}
+.modes button:focus-visible{outline:2px solid var(--tint-fill);outline-offset:2px}
+@media (max-width:520px){.modes .m-s{display:none}}
+.homemark .hbadge{position:absolute;left:7px;top:5px;width:17px;height:17px;display:grid;place-items:center;border-radius:50%;background:#00098b;color:#fff;box-shadow:0 0 0 2px #fff}
+.homemark .hbadge svg{width:11px;height:11px}
+.mp-none{margin:6px 2px 2px;color:var(--ink-2);font-size:14px}
+.addr{display:block;color:var(--ink-2);font-size:13.5px;line-height:1.3}

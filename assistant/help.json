@@ -2235,7 +2235,9 @@
         "what is the proximity finder",
         "open the proximity finder",
         "which fitter is closest to this postcode",
-        "where is the nearest van right now"
+        "where is the nearest van right now",
+        "which fitter lives nearest",
+        "who lives closest to this site"
       ],
       "keys": [
         "nearby",
@@ -2248,9 +2250,11 @@
         "fleetview",
         "live vehicle positions",
         "surveyor",
-        "vehicle"
+        "vehicle",
+        "lives nearest",
+        "home"
       ],
-      "answer": "Nearby shows who is nearest a site. Type the postcode from an enquiry (and the first line of the address for the exact spot): Admins and Super Admins get the nearest vehicles right now from FleetView; everyone with the app gets the surveyor working nearest today and on each of the next 14 days, from the Monday Work Programme. Distances and drive times are the best road route.",
+      "answer": "Nearby shows who is nearest a site. Type the postcode from an enquiry (and the first line of the address for the exact spot), then switch between three views: Live (Admins and Super Admins get the nearest vehicles right now from FleetView; others see who is working nearest today), Booked (who is booked nearest today and on each of the next 14 days, from the Monday Work Programme and HubSpot surveys) and Home (which fitter lives nearest, from the Monday Team Details board). Distances and drive times are the best road route.",
       "link": {
         "tile": "proximity",
         "label": "Open Nearby"

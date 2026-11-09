@@ -2,14 +2,18 @@
    FLR Hub: Nearby (Hub tile 'proximity'). Enter a site postcode and see:
      - Right now: the vans nearest the site, from FleetView's live positions (Admins and Super Admins only);
      - Booked today: the fitter booked nearest the site today, from the Monday Work Programme;
-     - Next 14 days: who is booked nearest on each of the next 14 days.
+     - Next 14 days: who is booked nearest on each of the next 14 days;
+     - Home (Nearby 1.3): which fitter lives nearest, from the Monday board FLR - Team Details (Flooring Operatives).
+   After a search three views share the map: Live (the default: vehicles right now, or today's work for accounts without
+   live positions), Booked (today and the next 14 days) and Home.
    It is the Team Proximity Finder Claude page moved onto the Hub, where the live van positions already are.
 
    The data: public.proximity_board() (Estimator repo, 20261016400000_flr_proximity.sql) answers
      { readAt, firstDay, lastDay, bookings: [{fitter, code, job, url, address, postcode, lat, lon, status, start, end}],
        triedAt, failingSince, pageError,
        vansAllowed, fleetview: {okAt, failing} | null,
-       vans: [{reg, driver, lat, lon, ignition, speed, seenAt, movingAt, stopAt, stopSeen}] | null }
+       vans: [{reg, driver, lat, lon, ignition, speed, seenAt, movingAt, stopAt, stopSeen}] | null,
+       homes: [{name, address, postcode, lat, lon}], homesAt, homesFailing }   (homes: Nearby 1.3, for everyone on the app)
    The flr-proximity Edge Function reads the Work Programme (read-only) every 15 minutes; flr-arrivals keeps the van
    positions (FleetView, every 2 minutes from 06:00 to 21:00 UK time). An open page asks again every 2 minutes.
 
@@ -157,6 +161,9 @@
   }
 
   /* ---------------------------------------------------------------- state */
+  // "William (Scott) Duncan" on Team Details is Scott Duncan, as on the Work Programme and the photos
+  const shownName = n => String(n).replace(/^(\S+)\s*\(([^)]+)\)\s*/, '$2 ').replace(/\s+/g, ' ').trim();
+  let MODE = 'live', HOMES = [];   // the view after a search: 'live' | 'booked' | 'home'
   let DATA = null, BOOKINGS = [], VANS = [], TODAY = iso(new Date()), lastSearch = null, LAST = null;
 
   // proximity_board()'s answer, checked; anything else counts as not loaded.
@@ -174,7 +181,15 @@
     const vans = Array.isArray(d.vans) ? d.vans.filter(v => v && str(v.reg) && num(v.lat) != null && num(v.lon) != null && !isNaN(new Date(v.seenAt))).map(v => ({
       reg: v.reg, driver: str(v.driver) || null, pos: { lat: v.lat, lon: v.lon }, ignition: v.ignition === true, speed: num(v.speed),
       seenAt: v.seenAt, stopAt: v.stopAt || null, stopSeen: v.stopSeen === true, make: str(v.make), model: str(v.model), plate: str(v.plate) })) : [];
+    // Where the fitters live: the postcode's centre (else the district's) until the page finds the exact house
+    const homes = Array.isArray(d.homes) ? d.homes.filter(x => x && str(x.name)).map(x => {
+      const postcode = str(x.postcode) || null;
+      let pos = num(x.lat) != null && num(x.lon) != null ? { lat: x.lat, lon: x.lon } : null, rough = false;
+      if (!pos && postcode) { const dd = DISTRICTS.get(postcode.split(' ')[0]); if (dd) { pos = { lat: dd.lat, lon: dd.lon }; rough = true; } }
+      return { name: shownName(x.name), address: str(x.address) || null, postcode, pos, rough };
+    }) : [];
     return { readAt: d.readAt || null, failingSince: d.failingSince || null, bookings, vansAllowed: d.vansAllowed === true,
+      homes, homesAt: d.homesAt || null, homesFailing: d.homesFailing === true,
       surveysAt: d.surveysAt || null, surveysFailing: d.surveysFailing === true,
       fleetview: d.fleetview && typeof d.fleetview === 'object' ? d.fleetview : null, vans };
   }
@@ -202,9 +217,17 @@
       fv.title = 'Vehicle positions from FleetView, checked every 2 minutes from 06:00 to 21:00';
       fv.classList.toggle('stale', !ok || DATA.fleetview.failing || (Date.now() - ok) > 15 * 60000);
     }
+    const ts = $('#teamSource');
+    ts.hidden = !DATA.homesAt;
+    if (DATA.homesAt) {
+      ts.textContent = `Team Details · updated ${when(new Date(DATA.homesAt))}`;
+      ts.title = 'Where the fitters live, from the Monday board FLR - Team Details (Flooring Operatives), read every 15 minutes';
+      ts.classList.toggle('stale', DATA.homesFailing);
+    }
     const notes = [];
     if (DATA.failingSince) notes.push(`Couldn’t read Monday since ${when(new Date(DATA.failingSince))}.${DATA.readAt ? ` Showing the bookings from ${when(new Date(DATA.readAt))}.` : ''}`);
     if (DATA.vansAllowed && DATA.fleetview && DATA.fleetview.failing) notes.push('FleetView isn’t answering at the moment: vehicle positions may be out of date.');
+    if (DATA.homesFailing) notes.push('Team Details couldn’t be read just now: home addresses are from its last good read.');
     if (DATA.surveysFailing) notes.push('HubSpot couldn’t be read just now: survey appointments are from its last good read.');
     $('#notice').textContent = notes.join(' ');
     $('#notice').hidden = !notes.length;
@@ -403,6 +426,30 @@
     return a.lat != null ? { lat: a.lat, lon: a.lon, address: `${a.label}, ${a.town}, ${a.postcode}` } : null;
   }
 
+  /* ---------------------------------------------------------------- where the fitters live (Team Details, Nearby 1.3) */
+  // Ranked from their postcode's centre; the nearest few are then put on their exact house (Esri, from the first line of
+  // the address + the postcode, kept for the page's life) and given a road route (typical traffic, not live).
+  const EXACT = new Map();   // "name|address|postcode" -> {lat, lon} | 'fail' | null (asked)
+  const homeKey = x => `${x.name}|${x.address || ''}|${x.postcode || ''}`;
+  const settled = x => { const k = homeKey(x); return EXACT.has(k) ? EXACT.get(k) !== null : !(KEY && x.address && x.postcode); };
+  function homesNear(site) {
+    return HOMES.filter(x => x.pos).map(x => {
+      const e = EXACT.get(homeKey(x)), exact = !!e && e !== 'fail', at = exact ? e : x.pos;
+      return { ...x, at, exact, d: distTo(at, site, false) };
+    }).sort((a, z) => a.d.mins - z.d.mins);
+  }
+  let exactTimer = 0;
+  function placeHomes(list) {
+    for (const x of list) {
+      const k = homeKey(x);
+      if (EXACT.has(k) || !KEY || !x.address || !x.postcode) continue;
+      EXACT.set(k, null);
+      addressFor(x.address, x.postcode).then(a => EXACT.set(k, a ? { lat: a.lat, lon: a.lon } : 'fail'), () => EXACT.set(k, 'fail'))
+        .then(() => { clearTimeout(exactTimer); exactTimer = setTimeout(() => { if (LAST && MODE === 'home') render(LAST.pc, LAST.district, LAST.site, LAST.known, true); }, 150); });
+    }
+  }
+  const homeLine = x => [x.address, x.postcode].filter(Boolean).join(', ') || 'No address on Team Details';
+
   /* ---------------------------------------------------------------- the map (Fleet Management's satellite and street maps) */
   const ESRI_KEY = String(window.FLR_MAP_KEY || '').trim();
   const tok = ESRI_KEY ? `?token=${encodeURIComponent(ESRI_KEY)}` : '';
@@ -446,7 +493,7 @@
     const html = h('div', null, h('span', { class: 'halo' }), im ? h('img', { class: `vimg vk-${kind}`, src: im[1], alt: '' }) : icon('i-van', 'vimg'));
     return L.divIcon({ className: cls, html, iconSize: [0, 0] });
   }
-  function drawMap(site, list, todays, keepView) {
+  function drawMap(site, list, todays, keepView, homes) {
     const M = mapInit();
     if (!M) return;
     M.layer.clearLayers(); M.marks.clear();
@@ -456,7 +503,16 @@
       h('span', { class: 'r-sweep' }), h('span', { class: 'r-pulse' }), h('span', { class: 'r-dot' }));
     L.marker([site.lat, site.lon], { icon: L.divIcon({ className: 'sitemark', html: radar, iconSize: [0, 0] }), zIndexOffset: -1000, keyboard: false, interactive: false }).addTo(M.layer);
     const pts = [[site.lat, site.lon]];
-    if (DATA.vansAllowed) {
+    if (MODE === 'home') {
+      // Where the nearest fitters live: their photo with a small house, on the exact house once it's found
+      (homes || []).slice(0, 12).forEach((x, i) => {
+        const m = L.marker([x.at.lat, x.at.lon], { icon: L.divIcon({ className: 'jobmark homemark', html: h('div', null, face(x.name, 'sm'), h('span', { class: 'hbadge' }, icon('i-home'))), iconSize: [0, 0] }), title: x.name }).addTo(M.layer);
+        m.bindTooltip(`${x.name} · home${x.exact ? '' : ' (postcode)'} · ${milesTxt(x.d)} · ${timeTxt(x.d)}`, { className: 'vt', direction: 'top', offset: [0, -20] });
+        m.on('click', () => pickHome(x.name, false));
+        M.marks.set(`h:${x.name}`, { m, h: x });
+        if (i < 4) pts.push([x.at.lat, x.at.lon]);
+      });
+    } else if (MODE === 'live' && DATA.vansAllowed) {
       list.forEach((v, i) => {
         const m = L.marker([v.pos.lat, v.pos.lon], { icon: vanIcon(v, false), title: `${v.who || 'Unassigned'} · ${plateOf(v)}` }).addTo(M.layer);
         m.bindTooltip(`${v.who || 'Unassigned'} · ${plateOf(v)} · ${milesTxt(v.d)} · ${timeTxt(v.d)}`, { className: 'vt', direction: 'top', offset: [0, -22] });
@@ -526,15 +582,22 @@
   function clearSearch() {
     lastSearch = null; LAST = null;
     $('#postcode').value = ''; $('#line').value = ''; $('#addr').value = '';
-    $('#results').hidden = true; $('#site').hidden = true; $('#clear').hidden = true; hint('');
+    $('#results').hidden = true; $('#site').hidden = true; $('#clear').hidden = true; $('#modes').hidden = true; hint('');
     drawLive();
   }
   $('#clear').addEventListener('click', clearSearch);
   let framed = 0;
   new ResizeObserver(() => { clearTimeout(framed); framed = setTimeout(frame, 150); }).observe(document.getElementById('map'));
+  function pickHome(name, fly = true) {
+    if (!MAP) return;
+    document.querySelectorAll('.mappanel [data-home]').forEach(b => b.setAttribute('aria-current', String(b.dataset.home === name)));
+    const o = MAP.marks.get(`h:${name}`);
+    if (o && fly) MAP.map.flyTo([o.h.at.lat, o.h.at.lon], Math.max(MAP.map.getZoom(), 14), { duration: matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 0.6 });
+    if (o) o.m.openTooltip();
+  }
   function pick(reg, fly = true) {
     if (!MAP) return;
-    for (const [r, o] of MAP.marks) o.m.setIcon(vanIcon(o.v, r === reg));
+    for (const [r, o] of MAP.marks) if (o.v) o.m.setIcon(vanIcon(o.v, r === reg));
     document.querySelectorAll('.mappanel [data-reg]').forEach(b => b.setAttribute('aria-current', String(b.dataset.reg === reg)));
     const o = MAP.marks.get(reg);
     if (o && fly) MAP.map.flyTo([o.v.pos.lat, o.v.pos.lon], Math.max(MAP.map.getZoom(), 13), { duration: matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 0.6 });
@@ -547,7 +610,7 @@
   }
   function render(pc, district, site, known, quiet) {
     const label = pc.full || pc.outcode;
-    $('#site').hidden = false; $('#clear').hidden = false;
+    $('#site').hidden = false; $('#clear').hidden = false; $('#modes').hidden = false;
     if (MAP) MAP.live = false;
     $('#mappanel').className = 'mappanel';
     $('#site').replaceChildren(
@@ -557,13 +620,40 @@
 
     const todays = nearestOn(TODAY, site);
     const vans = VANS.map(v => ({ ...v, d: distTo(v.pos, site, true), who: whoInVan(v) })).sort((a, z) => a.d.mins - z.d.mins);
-
-    // The map's panel: the nearest vans right now (FleetView) or, without live positions, who is working nearest today
+    const homes = MODE === 'home' ? homesNear(site) : [];
     const panel = $('#mappanel');
-    if (DATA.vansAllowed && vans.length) {
+    const todayList = (eyebrow, title, sub) => {
+      panel.replaceChildren(
+        h('div', { class: 'mp-head' }, h('span', { class: 'eyebrow' }, eyebrow), h('h2', null, title), sub ? h('p', null, sub) : null),
+        todays.length ? h('ul', { class: 'mp-list' }, todays.slice(0, 12).map(b => h('li', null, h('div', { class: 'mp-row' },
+          person(b.fitter, [codeBadge(b), tbc(b)], h('span', { class: 'then' }, jobLink(b)), 'sm'),
+          h('span', { class: 'mi' }, milesTxt(b.d), h('span', null, timeTxt(b.d)))))))
+          : h('p', { class: 'mp-none' }, 'Nobody is booked on the Work Programme today.'));
+    };
+
+    if (MODE === 'home') {
+      // Home: who lives nearest the site (Team Details, Flooring Operatives)
+      const [top, ...rest] = homes;
+      panel.replaceChildren(
+        h('div', { class: 'mp-head' }, h('span', { class: 'eyebrow' }, 'Home · Team Details'), h('h2', null, 'Lives nearest'),
+          h('p', null, `${homes.length} fitters with a home postcode`)),
+        ...(top ? [
+          h('button', { type: 'button', class: 'mp-first', 'data-home': top.name, title: 'Show on the map' },
+            person(top.name, null, h('span', { class: 'addr' }, homeLine(top)), 'lg'),
+            h('span', { class: 'far' }, farLine(top.d), top.exact ? null : ' · from the postcode')),
+          h('ul', { class: 'mp-list', 'aria-label': 'Next nearest homes' }, rest.slice(0, 12).map(x => h('li', null,
+            h('button', { type: 'button', class: 'mp-row', 'data-home': x.name },
+              person(x.name, null, h('span', { class: 'addr' }, homeLine(x)), 'sm'),
+              h('span', { class: 'mi' }, milesTxt(x.d), h('span', null, timeTxt(x.d)))))))
+        ] : [h('p', { class: 'mp-none' }, DATA.homesAt ? 'No fitter on Team Details has a home postcode yet.' : 'Team Details hasn’t been read yet.')]));
+      panel.querySelectorAll('[data-home]').forEach(b => b.addEventListener('click', () => pickHome(b.dataset.home)));
+    } else if (MODE === 'booked') {
+      todayList(`Booked · today · ${fmtWeekday(TODAY)} ${fmtDate(TODAY)}`, 'Working nearest today', 'Next 14 days below the map');
+    } else if (DATA.vansAllowed && vans.length) {
+      // Live: the nearest vehicles right now (FleetView)
       const [top, ...rest] = vans;
       panel.replaceChildren(
-        h('div', { class: 'mp-head' }, h('span', { class: 'eyebrow' }, 'Right now · FleetView'), h('h2', null, 'Nearest vehicle'),
+        h('div', { class: 'mp-head' }, h('span', { class: 'eyebrow' }, 'Live · FleetView'), h('h2', null, 'Nearest vehicle'),
           h('p', null, `${vans.length} vehicles with a position`)),
         h('button', { type: 'button', class: 'mp-first', 'data-reg': top.reg, title: 'Show on the map' },
           person(top.who || 'Unassigned vehicle', plateEl(plateOf(top), true), vanState(top), 'lg'),
@@ -574,51 +664,57 @@
             h('span', { class: 'mi' }, milesTxt(v.d), h('span', null, timeTxt(v.d))))))));
       panel.querySelectorAll('[data-reg]').forEach(b => b.addEventListener('click', () => pick(b.dataset.reg)));   // the nearest too
     } else if (DATA.vansAllowed) {
-      panel.replaceChildren(h('div', { class: 'mp-head' }, h('span', { class: 'eyebrow' }, 'Right now · FleetView'), h('h2', null, 'No vehicle positions yet')));
+      panel.replaceChildren(h('div', { class: 'mp-head' }, h('span', { class: 'eyebrow' }, 'Live · FleetView'), h('h2', null, 'No vehicle positions yet')));
     } else {
-      panel.replaceChildren(
-        h('div', { class: 'mp-head' }, h('span', { class: 'eyebrow' }, `Today · ${fmtWeekday(TODAY)} ${fmtDate(TODAY)}`), h('h2', null, 'Working nearest'),
-          h('p', null, 'From the Work Programme. Live vehicle positions are for Admins.')),
-        h('ul', { class: 'mp-list' }, todays.slice(0, 12).map(b => h('li', null, h('div', { class: 'mp-row' },
-          person(b.fitter, codeBadge(b), h('span', { class: 'then' }, b.job), 'sm'),
-          h('span', { class: 'mi' }, milesTxt(b.d), h('span', null, timeTxt(b.d))))))));
+      todayList(`Live · today · ${fmtWeekday(TODAY)} ${fmtDate(TODAY)}`, 'Working nearest', 'From the Work Programme. Live vehicle positions are for Admins.');
     }
 
-    // Booked nearest today: the Work Programme
-    const top = todays[0];
-    $('#today').replaceChildren(
-      h('span', { class: 'eyebrow' }, `Booked nearest today · ${fmtWeekday(TODAY)} ${fmtDate(TODAY)}`),
-      ...(top ? [
-        person(top.fitter, [codeBadge(top, true), tbc(top)], h('span', { class: 'detail' }, 'Working at ', jobLink(top), top.postcode ? [' (', h('span', { class: 'pc' }, top.postcode), ')'] : null), 'lg'),
-        h('span', { class: 'far' }, farLine(top.d)),
-        todays.length > 1 ? h('div', { class: 'also' }, h('span', { class: 'eyebrow' }, 'Also out today'),
-          todays.slice(1, 6).map(b => h('div', { class: 'mate' }, person(b.fitter, [codeBadge(b), tbc(b)], null, 'sm'),
-            h('span', { class: 'miles' }, `${milesTxt(b.d)} · ${timeTxt(b.d)}`)))) : null,
-      ] : [h('span', { class: 'none' }, 'Nobody is booked on the Work Programme today.')]));
-
-    // Next 14 days
-    const rows = [];
-    for (let i = 1; i <= DAYS_AHEAD; i++) {
-      const day = addDays(TODAY, i), list = nearestOn(day, site);
-      if (!list.length) continue;
-      const [n, ...rest] = list;
-      rows.push(h('li', { class: 'row' },
-        h('div', { class: 'dayname' }, i === 1 ? 'Tomorrow' : fmtWeekday(day), h('span', null, fmtDate(day))),
-        h('div', { class: 'fit' },
-          person(n.fitter, [codeBadge(n), tbc(n)], h('span', { class: 'job' }, jobLink(n), n.postcode ? [' · ', h('span', { class: 'pc' }, n.postcode)] : null, ` · ${fmtRange(n)}`), 'sm'),
-          rest.length ? h('span', { class: 'then' }, 'then ' + rest.slice(0, 2).map(b => `${b.fitter} ${milesTxt(b.d)}`).join(', ')) : null),
-        h('div', { class: 'dist' }, h('span', { class: 'miles' }, milesTxt(n.d)), h('span', null, timeTxt(n.d)))));
+    // Booked: today's nearest and the next 14 days, under the map
+    $('#results').hidden = MODE !== 'booked';
+    if (MODE === 'booked') {
+      const top = todays[0];
+      $('#today').replaceChildren(
+        h('span', { class: 'eyebrow' }, `Booked nearest today · ${fmtWeekday(TODAY)} ${fmtDate(TODAY)}`),
+        ...(top ? [
+          person(top.fitter, [codeBadge(top, true), tbc(top)], h('span', { class: 'detail' }, 'Working at ', jobLink(top), top.postcode ? [' (', h('span', { class: 'pc' }, top.postcode), ')'] : null), 'lg'),
+          h('span', { class: 'far' }, farLine(top.d)),
+        ] : [h('span', { class: 'none' }, 'Nobody is booked on the Work Programme today.')]));
+      const rows = [];
+      for (let i = 1; i <= DAYS_AHEAD; i++) {
+        const day = addDays(TODAY, i), list = nearestOn(day, site);
+        if (!list.length) continue;
+        const [n, ...rest] = list;
+        rows.push(h('li', { class: 'row' },
+          h('div', { class: 'dayname' }, i === 1 ? 'Tomorrow' : fmtWeekday(day), h('span', null, fmtDate(day))),
+          h('div', { class: 'fit' },
+            person(n.fitter, [codeBadge(n), tbc(n)], h('span', { class: 'job' }, jobLink(n), n.postcode ? [' · ', h('span', { class: 'pc' }, n.postcode)] : null, ` · ${fmtRange(n)}`), 'sm'),
+            rest.length ? h('span', { class: 'then' }, 'then ' + rest.slice(0, 2).map(b => `${b.fitter} ${milesTxt(b.d)}`).join(', ')) : null),
+          h('div', { class: 'dist' }, h('span', { class: 'miles' }, milesTxt(n.d)), h('span', null, timeTxt(n.d)))));
+      }
+      $('#days').replaceChildren(...(rows.length ? rows : [h('li', { class: 'empty' }, `No bookings on the Work Programme in the next ${DAYS_AHEAD} days.`)]));
     }
-    $('#days').replaceChildren(...(rows.length ? rows : [h('li', { class: 'empty' }, `No bookings on the Work Programme in the next ${DAYS_AHEAD} days.`)]));
-    $('#results').hidden = false;
-    drawMap(site, vans, todays, quiet);
-    // Road routes for what's on screen: the nearest vans, today's nearest and each day's nearest few.
+    drawMap(site, vans, todays, quiet, homes);
+
+    // Road routes for what's on screen only
     const want = [];
-    if (DATA.vansAllowed) for (const v of vans.slice(0, 8)) want.push([v.pos, site, true]);
-    for (const b of todays.slice(0, 6)) want.push([b.pos, site, false]);
-    for (let i = 1; i <= DAYS_AHEAD; i++) for (const b of nearestOn(addDays(TODAY, i), site).slice(0, 3)) want.push([b.pos, site, false]);
+    if (MODE === 'home') {
+      const near = homes.slice(0, 8);
+      placeHomes(near);
+      for (const x of near) if (settled(x)) want.push([x.at, site, false]);   // once the exact house is known (or can't be)
+    } else if (MODE === 'booked') {
+      for (const b of todays.slice(0, 6)) want.push([b.pos, site, false]);
+      for (let i = 1; i <= DAYS_AHEAD; i++) for (const b of nearestOn(addDays(TODAY, i), site).slice(0, 3)) want.push([b.pos, site, false]);
+    } else if (DATA.vansAllowed) for (const v of vans.slice(0, 8)) want.push([v.pos, site, true]);
+    else for (const b of todays.slice(0, 6)) want.push([b.pos, site, false]);
     roads(want);
   }
+  // Live / Booked / Home: the view after a search (Live each time the page opens)
+  function setMode(m) {
+    MODE = m;
+    document.querySelectorAll('#modes button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === m)));
+    if (LAST) render(LAST.pc, LAST.district, LAST.site, LAST.known, false);
+  }
+  document.querySelectorAll('#modes button').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
 
   $('#search').addEventListener('submit', e => { e.preventDefault(); search($('#postcode').value); });
   $('#line').addEventListener('input', suggestLines);
@@ -636,7 +732,7 @@
     $('#gate-retry').hidden = !o.retry;
   }
   function show(board) {
-    DATA = board; BOOKINGS = board.bookings; VANS = board.vans; TODAY = iso(new Date());
+    DATA = board; BOOKINGS = board.bookings; VANS = board.vans; HOMES = board.homes; TODAY = iso(new Date());
     if (!refresher) refresher = setInterval(() => { if (document.visibilityState === 'visible' && document.body.dataset.view === 'ready') check(true); }, REFRESH_MS);
     showSource();
     document.body.dataset.view = 'ready';
