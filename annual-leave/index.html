@@ -767,6 +767,25 @@ button.mine-row .mr-main>.rq-times{display:flex}   /* not the block the row's ot
   .mine-row:has(.rq-times) .rq-times{grid-area:times;margin-top:10px;flex-wrap:nowrap}   /* "by …" goes under its time instead */
 }
 .mr-main{min-width:0}
+/* Asking to cancel accepted leave: under the row's status, or on its own line on a phone */
+.mr-status{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px}
+.mine-rows>li{position:relative}
+.mr-cancel{position:absolute;right:44px;bottom:6px;min-height:28px;padding:0 6px;border:0;border-radius:8px;background:none;color:var(--red-ink);font:600 13px/28px var(--font-text);cursor:pointer;-webkit-tap-highlight-color:transparent}
+.mine-row.nb>.mr-cancel{right:10px}
+.mine-rows>li:has(>.mr-cancel) .rq-times{padding-right:150px}   /* the times stay clear of it */
+.mr-cancel:disabled{opacity:.45;cursor:default}
+@media (hover:hover){.mr-cancel:hover:not(:disabled){background:var(--red-soft)}}
+.mr-cancel:active:not(:disabled){background:var(--red-soft)}
+.mr-cancel:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+.rq-times:has(.rq-t:nth-child(3)){flex-wrap:wrap!important}
+.appr-sects{display:grid;gap:24px}
+.cancel-body{display:block}
+@media (max-width:600px){
+  .mr-status{justify-content:flex-start}
+  .mine-rows>li:has(>.mr-cancel) .rq-times{padding-right:0}
+  .mr-cancel,.mine-row.nb>.mr-cancel{position:static;display:block;min-height:44px;padding:0 16px 4px;line-height:40px;text-align:left;margin-left:0}
+  .mine-row.nb>.mr-cancel{grid-column:1 / -1;padding:0;justify-self:start}
+}
 .empty-act{margin-top:12px}
 @media (max-width:420px){.mine-row{grid-template-columns:46px minmax(0,1fr)}.mr-status{grid-column:2}}
 /* A person's record (approvers): the same parts, with "When FLR is closed" beside the days left, each request opening
@@ -2028,6 +2047,23 @@ async function decide(id, action) {
   await load();
 }
 
+async function cancelStep(id, step, done) {
+  if (state.busy) return;
+  state.busy = id;
+  renderAll();
+  try { await step(); } catch (err) {
+    state.busy = null;
+    renderAll();
+    showToast(`That wasn’t saved: ${(err && (err.details || err.message)) || 'try again in a moment.'}`);
+    return;
+  }
+  state.busy = null;
+  showToast(done);
+  await load();
+}
+const askCancel = (id) => cancelStep(id, () => window.__FLR_LEAVE.askCancel(id), 'Sent to a leave approver. The holiday stays booked until they decide.');
+const keepLeave = (id) => cancelStep(id, () => window.__FLR_LEAVE.keepLeave(id), 'Holiday kept.');
+
 /* ---------------------------------------------------------------------
    Helpers
    --------------------------------------------------------------------- */
@@ -2083,10 +2119,24 @@ function decidedBy(r) {
   const hub = Date.parse(d.at), board = Date.parse(r.cur.decidedAt || '');
   return Number.isFinite(hub) && Number.isFinite(board) && Math.abs(hub - board) > 60000 ? '' : d.by;
 }
+// Asking to cancel accepted leave (on the Hub): the holiday stays booked until a leave approver decides. Asking is possible
+// until the leave starts, and the FLR server checks that and whose it is. Approving is the normal "Cancelled" decision.
+function cancelOf(r) {
+  const c = window.__FLR_LEAVE && window.__FLR_LEAVE.cancels ? window.__FLR_LEAVE.cancels[r.id] : null;
+  return c && r.decision === 'accepted' ? c : null;
+}
+const cancelWaiting = (r) => { const c = cancelOf(r); return Boolean(c) && c.status === 'waiting'; };
+const canAskCancel = (r) => Boolean(window.__FLR_LEAVE && window.__FLR_LEAVE.askCancel) && r.decision === 'accepted' && !cancelWaiting(r)
+  && (state.ctx.daysOf(r).from || r.from || '') > state.ctx.today;
+const statusHtml = (r) => `${pillFor(r.decision)}${cancelWaiting(r) ? '<span class="pill review">Waiting to cancel</span>' : ''}`;
+const askCancelBtn = (r) => (canAskCancel(r) ? `<button class="mr-cancel" type="button" data-act="cancel-ask" data-id="${esc(r.id)}" aria-label="${esc(`Cancel this request? ${fmtRange(r.from, r.to)}`)}" ${state.busy ? 'disabled' : ''}>Cancel this request?</button>` : '');
 // [label, when, who]: who only for a decision made on the Hub
 function requestTimes(r) {
   const out = [[r.imported ? 'Imported' : 'Requested', fmtStamp(r.createdAt) || '—', '']];
   if (DECIDED_WORD[r.decision]) out.push([DECIDED_WORD[r.decision], fmtStamp(r.cur.decidedAt) || (r.cur.decidedOn ? fmtDate(r.cur.decidedOn) : '—'), decidedBy(r)]);
+  const c = cancelOf(r);
+  if (c && c.status === 'waiting') out.push(['Cancel requested', fmtStamp(c.askedAt) || '—', c.askedBy || '']);
+  if (c && c.status === 'declined') out.push(['Cancel declined', fmtStamp(c.decidedAt) || '—', c.decidedBy || '']);
   return out;
 }
 const whenHtml = (when, by) => `<span class="rq-when">${esc(when)}</span>${by ? ` <span class="rq-by">by ${esc(by)}</span>` : ''}`;
@@ -2288,7 +2338,7 @@ function renderChrome() {
   // Everyone has Today. Staff on the FLR Hub have it and My Leave; approvers have every tab; on Claude there's no My Leave.
   for (const t of document.querySelectorAll('#tabs .tab')) t.hidden = !tabsFor().includes(t.dataset.id);
   if (state.data && !tabsFor().includes(state.tab)) state.tab = staffView() ? 'today' : 'approvals';
-  const open = state.data ? state.data.requests.filter(isPending).length : 0;
+  const open = state.data ? state.data.requests.filter((r) => isPending(r) || cancelWaiting(r)).length : 0;
   for (const t of document.querySelectorAll('#tabs .tab')) {
     const on = t.dataset.id === state.tab;
     t.setAttribute('aria-selected', String(on));
@@ -2500,12 +2550,41 @@ function renderTodayStaff(day) {
 
 /* ---------- Approvals ---------- */
 function renderApprovals() {
-  const open = state.data.requests.filter(isPending).sort((a, b) => (a.from || '9999').localeCompare(b.from || '9999'));
-  setHead('Approvals', open.length ? `${open.length} request${open.length === 1 ? '' : 's'} waiting, soonest leave first` : 'Nothing waiting on you');
-  if (!open.length) {
-    return emptyHtml('All caught up', 'New requests from the staff form appear here. Use the Diary to see who is off, and select a name there for their days left.', 'done');
+  const byFirstDay = (x, z) => (x.from || '9999').localeCompare(z.from || '9999');
+  const open = state.data.requests.filter(isPending).sort(byFirstDay), asks = state.data.requests.filter(cancelWaiting).sort(byFirstDay);
+  const words = [open.length ? `${open.length} request${open.length === 1 ? '' : 's'} waiting` : '', asks.length ? `${asks.length} to cancel` : ''].filter(Boolean).join(', ');
+  setHead('Approvals', words ? `${words}, soonest leave first` : 'Nothing waiting on you');
+  if (!open.length && !asks.length) {
+    return emptyHtml('All caught up', 'New requests from the staff form appear here, and requests to cancel accepted leave. Use the Diary to see who is off, and select a name there for their days left.', 'done');
   }
-  return `<div class="cards">${open.map(renderCard).join('')}</div>`;
+  const section = (id, title, html) => `<section aria-labelledby="${id}"><h2 class="mine-sect" id="${id}">${title}</h2><div class="cards">${html}</div></section>`;
+  if (!asks.length) return `<div class="cards">${open.map(renderCard).join('')}</div>`;
+  return `<div class="appr-sects">${section('asks-h', `Requests to cancel · ${asks.length}`, asks.map(renderCancelCard).join(''))}
+    ${open.length ? section('open-h', `New requests · ${open.length}`, open.map(renderCard).join('')) : ''}</div>`;
+}
+// Someone asks to cancel accepted leave: approve it (the normal "Cancelled" decision: the days go back) or keep the holiday.
+function cancelButtons(r, anyBusy, busy) {
+  return `<div class="decide-row">
+      <button class="btn accept lg" type="button" data-act="decide" data-id="${esc(r.id)}" data-action="Cancelled" ${anyBusy ? 'disabled' : ''}${busy ? ' aria-busy="true"' : ''}>${busy ? `${icon('spin', 'ico spin')}Saving…` : `${icon('check')}Approve cancellation`}</button>
+      <button class="btn lg" type="button" data-act="cancel-keep" data-id="${esc(r.id)}" ${anyBusy ? 'disabled' : ''}>Keep the holiday</button>
+    </div>`;
+}
+function renderCancelCard(r) {
+  const d = state.ctx.daysOf(r), c = cancelOf(r), name = displayName(r), anyBusy = Boolean(state.busy);
+  return `<article class="card" data-card="${esc(r.id)}" aria-label="${esc(`${name}: request to cancel`)}">
+    <header class="card-head">
+      <div class="ch-who">${avatar(name, staffIdOf(r))}<div><h2>${esc(name)}</h2><div class="meta-line"><span>Cancel requested ${whenHtml(fmtStamp(c.askedAt) || '—', c.askedBy)}</span></div></div></div>
+      <div class="ch-side">${statusHtml(r)}<button class="btn tinted sm" type="button" data-act="open" data-id="${esc(r.id)}">Details</button></div>
+    </header>
+    <div class="card-body cancel-body"><div class="card-col">
+      <section class="panel-block"><h3 class="eyebrow">Holiday to cancel</h3>
+        <p class="dates">${esc(fmtRange(d.from, d.to))}</p>
+        <div><span class="chip days num">${esc(plural(d.total, 'working day'))}</span></div>
+        <p class="subtle">Approving cancels this leave and the days go back into ${esc(firstName(name))}’s allowance. Until then it stays booked.</p>
+      </section>
+    </div></div>
+    <footer class="card-foot">${cancelButtons(r, anyBusy, state.busy === r.id)}</footer>
+  </article>`;
 }
 function decideButtons(r, anyBusy, busy) {
   return `<div class="decide-row">
@@ -2961,7 +3040,7 @@ function requestRowHtml(r, year) {
   return `<li><button class="mine-row" type="button" data-act="open" data-id="${esc(r.id)}">
       <span class="ag-date">${badge}</span>
       <span class="mr-main"><span class="mr-dates">${esc(fmtRange(d.from, d.to))}</span><span class="subtle">${esc(bits.join(' · '))}</span>${timesHtml(r)}</span>
-      <span class="mr-status">${pillFor(r.decision)}</span>${icon('chev-r', 'ico mr-go')}</button></li>`;
+      <span class="mr-status">${statusHtml(r)}</span>${icon('chev-r', 'ico mr-go')}</button>${askCancelBtn(r)}</li>`;
 }
 function renderMine() {
   const { me, requests, email } = mineFor();
@@ -2999,8 +3078,8 @@ function mineRequestsHtml(g, year) {
   const n = (rows) => rows.reduce((a, row) => a + row.list.length, 0);
   const rowHtml = (row) => `<li class="mine-row nb">
       <div class="mr-main"><p class="mr-dates">${esc(fmtRange(row.from, row.to))}${row.list.length > 1 ? ` · ${row.list.length} requests` : ''}</p><p class="subtle">${esc(row.text)}</p></div>
-      <div class="mr-status">${pillFor(row.decision)}</div>
-      <div class="mr-times">${row.list.map(timesHtml).join('')}</div></li>`;
+      <div class="mr-status">${row.list.length === 1 ? statusHtml(row.list[0]) : pillFor(row.decision)}</div>
+      <div class="mr-times">${row.list.map(timesHtml).join('')}</div>${row.list.length === 1 ? askCancelBtn(row.list[0]) : ''}</li>`;
   const list = (rows) => `<ul class="mine-rows">${rows.map(rowHtml).join('')}</ul>`;
   const group = (title, rows) => (rows.length ? `<h3 class="mine-grp-h">${esc(title)} · ${n(rows)}</h3>${list(rows)}` : '');
   const any = g.going.length || g.waiting.length || g.notGoing.length || g.before.length;
@@ -3186,7 +3265,7 @@ function renderOverlay() {
     const pending = isPending(r), ev = pending ? evaluate(r) : null, d = state.ctx.daysOf(r);
     const anyBusy = Boolean(state.busy), name = displayName(r), sid = staffIdOf(r);
     const details = ev ? ev.details : r.cur.details || 'No checks recorded for this request.';
-    const actions = pending
+    const actions = cancelWaiting(r) ? cancelButtons(r, anyBusy, state.busy === r.id) : pending
       ? `<label class="lbl" for="pnote-${esc(r.id)}"><span class="eyebrow">Note saved with the decision (optional)</span>
           <textarea class="note" id="pnote-${esc(r.id)}" data-note="${esc(r.id)}" ${anyBusy ? 'disabled' : ''}>${esc(state.notes[r.id] || '')}</textarea></label>
         ${decideButtons(r, anyBusy, state.busy === r.id)}`
@@ -3199,7 +3278,7 @@ function renderOverlay() {
         <button class="close" type="button" data-act="close" aria-label="Close details">${icon('close')}</button>
       </header>
       <div class="dlg-body">
-        <div class="decide-row">${pillFor(r.decision)}${ev ? suggestPill(ev.suggested) : ''}</div>
+        <div class="decide-row">${statusHtml(r)}${ev ? suggestPill(ev.suggested) : ''}</div>
         ${ev ? `<p class="subtle">${esc(screenReason(ev.reason))}</p>` : ''}
         <div class="statlist">
           <div class="stat"><span>Working days</span><b class="num">${fmtNum(d.total)}</b></div>
@@ -3242,6 +3321,13 @@ function requestDecision(id, action) {
     return;
   }
   decide(id, action);
+}
+function requestCancel(id) {
+  const r = state.data.requests.find((x) => x.id === id);
+  if (!r) return;
+  const mine = staffView() || (mineFor().me && String((state.ctx.staffOf(r) || {}).id) === String(mineFor().me.id));
+  state.confirm = { title: 'Are you sure you want to request to cancel this holiday?', body: `${fmtRange(r.from, r.to)}. ${mine ? 'It stays booked' : `It stays booked for ${firstName(displayName(r))}`} until a leave approver approves the cancellation.`, yes: 'Request to cancel', no: 'Keep the holiday', tone: 'deny', run: () => askCancel(id) };
+  renderOverlay();
 }
 /* ---------- Opening and closing a person's record ---------- */
 // The record shows in place of the tab it was opened from, which stays selected. "‹ Diary" above the name, that tab
@@ -3374,6 +3460,8 @@ document.addEventListener('click', async (ev) => {
     case 'person-back': closePerson(); break;
     case 'close': state.panel = null; renderOverlay(); break;
     case 'decide': requestDecision(id, el.dataset.action); break;
+    case 'cancel-ask': requestCancel(id); break;
+    case 'cancel-keep': keepLeave(id); break;
     case 'confirm-yes': { const run = state.confirm && state.confirm.run; state.confirm = null; renderOverlay(); if (run) run(); break; }
     case 'confirm-no': state.confirm = null; renderOverlay(); break;
     case 'month': {

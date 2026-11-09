@@ -1452,7 +1452,7 @@
         "cancel",
         "withdraw"
       ],
-      "answer": "Ask a leave approver. They can cancel accepted leave, which puts the days back into your allowance, or re-open a request.\n\nApprovers: open the request, then “Cancel leave” or “Re-open”.",
+      "answer": "On My Leave, press “Cancel this request?” on an accepted holiday that hasn’t started, then confirm. It goes to a leave approver, and the holiday stays booked until they decide. If they approve, the days go back into your allowance. To change dates, or once the leave has started, ask a leave approver.\n\nApprovers: requests to cancel are at the top of “Approvals”; press “Approve cancellation” or “Keep the holiday”. You can also open any request, then “Cancel leave” or “Re-open”.",
       "link": {
         "href": "annual-leave/",
         "label": "Open Annual Leave"
@@ -1473,7 +1473,7 @@
         "pending",
         "waiting"
       ],
-      "answer": "Leave approvers see every request waiting for a decision on the “Approvals” tab, each with Annual Leave’s own suggestion: accept, review or deny. Everyone else sees their own requests on My Leave.",
+      "answer": "Leave approvers see every request waiting for a decision on the “Approvals” tab, each with Annual Leave’s own suggestion: accept, review or deny, and any requests to cancel accepted leave. Everyone else sees their own requests on My Leave.",
       "data": "leave.pending",
       "link": {
         "href": "annual-leave/",

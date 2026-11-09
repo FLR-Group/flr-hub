@@ -115,7 +115,11 @@
       // who made each request's latest decision on the Hub (the audit trail), for "Accepted … by David Viner"
       decisions: h.decisions && typeof h.decisions === 'object' && !Array.isArray(h.decisions) ? h.decisions : {},
       // Check dates: who else in the reader's own leave group is off on those days, and whether it's full (the database decides)
-      checkDates: (from, to) => client().rpc('leave_check_dates', { p_from: from, p_to: to }).then(r => (r.error ? Promise.reject(r.error) : r.data)) };
+      checkDates: (from, to) => client().rpc('leave_check_dates', { p_from: from, p_to: to }).then(r => (r.error ? Promise.reject(r.error) : r.data)),
+      // asking to cancel accepted leave, and an approver keeping the holiday; approving is the normal "Cancelled" decision
+      cancels: h.cancels && typeof h.cancels === 'object' && !Array.isArray(h.cancels) ? h.cancels : {},
+      askCancel: item => client().rpc('leave_cancel_ask', { p_item: item }).then(r => (r.error ? Promise.reject(r.error) : r.data)),
+      keepLeave: item => client().rpc('leave_cancel_keep', { p_item: item }).then(r => (r.error ? Promise.reject(r.error) : r.data)) };
     try { FORM_URL = h.formUrl || ''; } catch (e) { /* the page keeps its own */ }   // eslint-disable-line no-undef
     version = h.version;
   }
