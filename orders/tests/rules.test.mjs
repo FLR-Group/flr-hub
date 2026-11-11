@@ -16,9 +16,10 @@ test('"today" is the day in London, in summer and winter time', () => {
   assert.equal(R.londonDay(new Date('2026-10-25T00:30:00Z')), '2026-10-25');   // the night the clocks go back
 });
 
-test('moved later after its first date had come, still to arrive: Delayed, on the main screen', () => {
+test('moved later after its first date had come: a new plan, under Coming up (not Needs attention) until the new date passes', () => {
   const s = look(order({ firstDay: '2026-10-09', day: '2026-10-14' }));
-  assert.equal(s.delay, 'active'); assert.equal(s.kind, 'upcoming'); assert.equal(s.bucket, 'late');
+  assert.equal(s.delay, 'active'); assert.equal(s.kind, 'upcoming'); assert.equal(s.bucket, 'upcoming');
+  assert.equal(look(order({ firstDay: '2026-10-01', day: '2026-10-09' })).bucket, 'late', 'the new date has passed too: overdue');
   const t = look(order({ firstDay: '2026-10-09', day: T }));
   assert.equal(t.delay, 'active'); assert.equal(t.bucket, 'dueToday');
   assert.equal(look(order({ firstDay: T, day: '2026-10-13' })).delay, 'active', 'due today, moved to tomorrow');
@@ -54,9 +55,9 @@ test('part received: never received, never gone from the outstanding lists', () 
   // Other problems don't make anything outstanding
   const e = look(order({ day: T, received: true, issues: ['Damaged'], items: [line('A', true, ['Damaged'])] }));
   assert.equal(e.kind, 'received'); assert.equal(e.partial, false);
-  // A partial order whose date was moved after its first date: still Delayed, and part received
+  // A partial order whose date was moved after its first date: part received, waiting for its new date
   const f = look(order({ firstDay: '2026-10-09', day: '2026-10-15', items: [line('A', true), line('B')] }));
-  assert.equal(f.partial, true); assert.equal(f.delay, 'active'); assert.equal(f.bucket, 'late');
+  assert.equal(f.partial, true); assert.equal(f.delay, 'active'); assert.equal(f.bucket, 'upcoming');
 });
 
 test('every order is in exactly one list, and only fully received ones in the received lists', () => {
@@ -90,11 +91,11 @@ test('a receipt shows at once: arrived products and their condition; the rest st
   const onMon = { ...o, items: [{ id: 'a', name: 'A', received: true, issues: ['Damaged'] }, o.items[1]], issues: ['Damaged'] };
   const [m] = R.applyReceipts([onMon], [sent], '2026-10-12T09:01:00Z');
   assert.equal(m.items[0].received, true); assert.equal(m.hubMismatch, false); assert.equal(m.hubPending, false);
-  // Monday read since the write but doesn't show it (unticked there, or the board was reset): the Hub's record stays,
-  // with a warning, so the page and the database agree on what can still be recorded
+  // Monday read since the write but doesn't show it: someone unticked it on Monday afterwards, so Monday wins
+  // (11 Nov 2026; the database's orders_hub_state does the same since Order Tracker 1.10)
   const [x] = R.applyReceipts([o], [sent], '2026-10-12T09:01:00Z');
-  assert.equal(x.items[0].received, true); assert.equal(x.hubMismatch, true);
-  assert.deepEqual(R.status(x, T).outstanding.map(i => i.id), ['b']);
+  assert.equal(x.items[0].received, false); assert.equal(x.hubMismatch, true);
+  assert.deepEqual(R.status(x, T).outstanding.map(i => i.id), ['a', 'b']);
   // written but not read back yet: no warning
   assert.equal(R.applyReceipts([o], [sent], '2026-10-12T08:59:00Z')[0].hubMismatch, false);
   assert.equal(m.hubReceipts.length, 1);
@@ -126,10 +127,11 @@ test('a correction: a material put back to still to arrive, a condition changed,
   // the database's state, when given, is used
   const hub = { '8': R.foldHub([rec, back, fixA, fixB]) };
   assert.deepEqual(R.applyReceipts([o], [rec, back, fixA, fixB], '2026-10-12T10:00:00Z', hub)[0].items, r.items);
-  // the correction written and Monday read since, but Monday still shows C received: a warning
+  // the correction written and Monday read since, but Monday still shows C received: it was ticked again on Monday
+  // afterwards, so Monday wins (11 Nov 2026)
   const sent = { ...back, state: 'sent', sentAt: '2026-10-12T11:00:05Z' };
   const [m] = R.applyReceipts([o], [rec, sent], '2026-10-12T11:01:00Z');
-  assert.equal(m.hubMismatch, true); assert.equal(m.items[2].received, false);
+  assert.equal(m.hubMismatch, true); assert.equal(m.items[2].received, true);
   const onMon = { ...o, received: false, receivedAt: null, items: [items[0], items[1], { ...items[2], received: false }] };
   assert.equal(R.applyReceipts([onMon], [rec, sent], '2026-10-12T11:01:00Z')[0].hubMismatch, false);
   // recorded again when it does come: received again, whole
@@ -165,4 +167,27 @@ test('1.6: an untick of a material ticked on monday.com puts it back to still to
   assert.equal(p.items[0].received, false); assert.equal(p.received, false); assert.equal(R.status(p, T).kind, 'today');
   const again = { id: 4, order: '11', kind: 'receipt', at: '2026-10-12T10:00:00Z', by: 'Ola', state: 'pending', whole: true, lines: [{ id: 'a', name: 'A', condition: 'arrived' }] };
   assert.equal(R.status(R.applyReceipts([o], [un, again], null)[0], T).kind, 'received');
+});
+
+test('Received ticked on the order itself on Monday counts for all its materials', () => {
+  const o = order({ received: true, receivedAt: '2026-10-12T09:00:00Z', items: [line('A'), line('B', true)] });
+  const [v] = R.applyReceipts([o], [], '2026-10-12T10:00:00Z', {});
+  assert.deepEqual(v.items.map(i => [i.received, !!i.byOrder]), [[true, true], [true, false]]);
+  const s = R.status(v, T);
+  assert.equal(s.kind, 'received'); assert.equal(s.partial, false);
+  assert.equal(R.status(o, T).partial, true, 'as before, the raw Monday data alone would say part received');
+});
+
+test("a Hub change that has reached Monday: a later tick or untick on Monday wins; before it's written, the Hub's shows", () => {
+  const items = [{ id: '11', name: 'A', received: true, issues: [] }];
+  const o = order({ id: '1', items });
+  const undo = { id: 2, order: '1', kind: 'correction', corrects: 1, reason: 'Ticked by mistake', lines: [{ id: '11', name: 'A', from: 'arrived', to: 'outstanding' }], at: '2026-10-12T08:00:00Z', state: 'sent', sentAt: '2026-10-12T08:01:00Z' };
+  const tick = { id: 1, order: '1', kind: 'receipt', lines: [{ id: '11', name: 'A', condition: 'arrived' }], at: '2026-10-12T07:00:00Z', state: 'sent', sentAt: '2026-10-12T07:01:00Z' };
+  const [after] = R.applyReceipts([o], [tick, undo], '2026-10-12T09:00:00Z');
+  assert.equal(after.items[0].received, true, 'Georgia ticked it on Monday after the Hub undo: Monday wins');
+  assert.equal(R.status(after, T).kind, 'received');
+  const [pending] = R.applyReceipts([o], [tick, { ...undo, state: 'pending', sentAt: null }], '2026-10-12T09:00:00Z');
+  assert.equal(pending.items[0].received, false, 'the undo is still being written: the Hub shows');
+  const [notRead] = R.applyReceipts([o], [tick, { ...undo, sentAt: '2026-10-12T09:30:00Z' }], '2026-10-12T09:00:00Z');
+  assert.equal(notRead.items[0].received, false, 'Monday not read since it was written: the Hub shows');
 });

@@ -22,7 +22,7 @@
   const AUTH_KEY = 'flr-estimator-auth';            // the one FLR sign-in for the whole site
   const SIGN_IN = '../?next=orders';
   const TZ = 'Europe/London';
-  const POLL_MS = 60 * 1000;                        // the page asks the database every minute; Monday is read every 5
+  const POLL_MS = 30 * 1000;                        // the page asks the database every 30 seconds; Monday is read every minute (1.10)
   const STALE_MIN = 20;                             // older than this with no reason given: say it may be out of date
   const ATTN_SHOWN = 3;                             // late orders shown before "Show all"
   const $ = (s, r = document) => r.querySelector(s);
@@ -120,7 +120,6 @@
     if (s.kind === 'received') return problems(o).length ? ['warn', cap(problems(o)[0])] : null;
     if (s.partial) return ['warn', 'Part received'];
     if (s.kind === 'overdue') return ['bad', 'Overdue'];
-    if (s.delay === 'active') return ['warn', 'Delayed'];
     return null;
   }
   // The order's current status in one line, saying each fact once: [tone, text, exception?]
@@ -128,8 +127,7 @@
     if (s.kind === 'received') return problems(o).length ? ['warn', `Received · ${problems(o).join(', ')}`, true] : ['good', 'Everything received', false];
     if (s.partial) return [s.kind === 'overdue' ? 'bad' : 'warn', [`Part received · ${stillToCome(s)}`, ...problems(o).filter(p => p !== 'item missing')].join(' · '), true];
     if (s.kind === 'overdue') return ['bad', 'Overdue · no new delivery date yet', true];
-    if (s.delay === 'active') return ['warn', `Delayed · first due ${dayLong(o.firstDay)}`, true];
-    if (s.delay === 'moved') return ['calm', `Date moved from ${dayLong(o.firstDay)} · not late`, true];
+    if (s.delay === 'active' || s.delay === 'moved') return ['calm', `Date moved from ${dayLong(o.firstDay)}`, true];
     if (s.kind === 'nodate') return ['calm', 'Awaiting a delivery date', false];
     return ['calm', 'Awaiting delivery', false];
   }
@@ -451,15 +449,18 @@
   function tickRow(o, i, today) {
     const k = `${o.id}:${i.id}`, busy = S.saving.get(k);
     const x = o.hubState && o.hubState.lines ? o.hubState.lines[i.id] : null;
-    const r = x && x.received && x.receipt ? (o.hubReceipts || []).find(e => e.id === x.receipt) : null;
+    const r = !i.mondayWins && x && x.received && x.receipt ? (o.hubReceipts || []).find(e => e.id === x.receipt) : null;
     const on = busy === 'tick' ? true : busy === 'undo' ? false : !!i.received;
     const p = i.whole ? { title: 'The whole delivery', qty: 'No materials listed on monday.com', kind: 'box' } : product(i.name);
     const probs = (i.issues || []).map(v => PROBLEM[v] || v.toLowerCase());
     const sync = r && r.state !== 'sent' ? (r.state === 'failed' ? ' · not on monday.com yet, it will try again' : ' · saving to monday.com…') : '';
     const who = busy === 'tick' ? 'Saving…' : busy === 'undo' ? 'Undoing…'
       : r ? `Ticked by ${r.by === S.data.you ? 'you' : r.by}, ${when(r.at, today)}${sync}`
+      : i.byOrder ? `Received${i.receivedAt ? `, ${when(i.receivedAt, today)}` : ''} · the whole order was ticked on monday.com`
       : i.received ? `Received${i.receivedAt ? `, ${when(i.receivedAt, today)}` : ''} · ticked on monday.com` : '';
-    const press = () => on ? (r ? untick(o, i, r) : untickMonday(o, i)) : tick(o, i);
+    // A material counted as arrived because Received is ticked on the whole order: untick the order on monday.com.
+    const press = () => on && i.byOrder ? toast('The whole order is ticked as received on monday.com. Untick it there.')
+      : on ? (r ? untick(o, i, r) : untickMonday(o, i)) : tick(o, i);
     const label = `${p.title}${p.qty && !i.whole ? ', ' + p.qty : ''}`;
     return h('li', { class: `tick${on ? ' on' : ''}${busy ? ' busy' : ''}` },
       h('button', { type: 'button', class: 'tick-box', role: 'checkbox', 'aria-checked': on ? 'true' : 'false', disabled: !!busy,
@@ -485,7 +486,7 @@
         solo && date ? h('p', { class: 'fact' }, icon('i-calendar'), date) : null,
         tone !== 'calm' || exception ? h('p', { class: `fact fact-${tone}` }, icon(tone === 'good' ? 'i-check' : tone === 'calm' ? 'i-calendar' : 'i-alert'), line) : null,
         latest ? note(latest, today) : null,
-        o.hubMismatch ? h('p', { class: 'fact fact-warn' }, icon('i-alert'), 'Ticked on the Hub, but monday.com shows it differently. Check the order on monday.com.') : null),
+        null),
       h('ul', { class: 'ticks', 'aria-label': 'Materials: tick each one when it arrives' }, lines.map(i => tickRow(o, i, today))),
       h('button', { class: 'od-problem', type: 'button', onclick: () => openProblem(o.id) }, icon('i-help'), 'Problem with a material? Contact the help line'),
       problemsAbout(o, today),
@@ -503,7 +504,7 @@
     const done = all.filter(x => x.s.kind === 'received').sort((x, y) => (y.o.receivedAt || '').localeCompare(x.o.receivedAt || ''));
     const lead = open[0] || done[0], a = arrival(lead.o, lead.s, today);
     const mats = job.orders.flatMap(linesOf), got = mats.filter(i => i.received).length;
-    const tone = open.some(x => x.s.kind === 'overdue') ? 'bad' : open.length ? (open.some(x => x.s.partial || x.s.delay === 'active') ? 'warn' : 'calm') : 'good';
+    const tone = open.some(x => x.s.kind === 'overdue') ? 'bad' : open.length ? (open.some(x => x.s.partial) ? 'warn' : 'calm') : 'good';
     const first = mats.find(i => !i.received) || mats[0];
     const id = 'od-' + job.key, sv = surveyorsOf(job), ft = fittersOf(job, today);
     return h('article', { class: `od od-${tone}`, 'aria-labelledby': id },
@@ -838,7 +839,7 @@
       if (!S.surveyors) S.surveyors = await fetchSurveyors();
       S.answers = (await fetchAnswers()) || S.answers;
       S.data = d; S.gotAt = Date.now(); S.err = null;
-      if (!d.readAt && !d.orders.length) gate('No deliveries yet', d.failing ? `The tracker couldn’t read monday.com yet. ${d.failing}` : 'The tracker hasn’t read the Goods In board yet. It does every 5 minutes.', { retry: true });
+      if (!d.readAt && !d.orders.length) gate('No deliveries yet', d.failing ? `The tracker couldn’t read monday.com yet. ${d.failing}` : 'The tracker hasn’t read the Goods In board yet. It does every minute.', { retry: true });
       else { render(); fetchPhotos().then(got => { if (got) render(); }); }
       if (chatOpen) chatOpen();
       if (byHand) toast(d.failing ? 'monday.com still isn’t answering' : 'Up to date');

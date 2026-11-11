@@ -9,9 +9,11 @@
      An order with something received and something outstanding is "part
      received": it stays with the orders still to come, never with the received.
    - Overdue: its date has passed and something is still outstanding.
-   - Delayed: its date was moved later on Monday after its first date had come
-     (it should have arrived by now). Only while something is outstanding.
+   - Delayed: its date was moved later on Monday after its first date had come.
+     A new date is a new plan, so it waits for its new date like any order and
+     only needs attention once that date has passed (Overdue). Shown, not flagged.
    - Date moved: moved later, but its first date hasn't come yet. Not late.
+   - Received ticked on the order itself on Monday counts for all its materials.
    Once an order has fully arrived, neither "Delayed" nor "Date moved" applies;
    the order's history still shows the move.
    ========================================================================== */
@@ -51,7 +53,7 @@
     if (s.kind === 'received') return s.recDay === today ? 'receivedToday' : 'receivedEarlier';
     if (s.kind === 'overdue') return 'late';
     if (s.kind === 'today') return 'dueToday';
-    if (s.kind === 'upcoming') return s.delay === 'active' ? 'late' : 'upcoming';
+    if (s.kind === 'upcoming') return 'upcoming';   // a moved date is a new plan, not a problem (11 Nov 2026)
     return 'nodate';
   }
 
@@ -82,11 +84,18 @@
     }
     return { lines, notes };
   }
+  /** What Monday says, read as people use it: Received ticked on the order itself means all of its materials arrived,
+   *  even when their own boxes weren't ticked (byOrder marks those). */
+  function mondayView(o) {
+    if (!o.received || !(o.items || []).some(i => !i.received)) return o;
+    return { ...o, items: o.items.map(i => i.received ? i : { ...i, received: true, receivedAt: i.receivedAt || o.receivedAt || null, byOrder: true }) };
+  }
   function applyReceipts(orders, receipts, readAt, hub) {
     const by = new Map();
     for (const r of receipts || []) { if (!by.has(r.order)) by.set(r.order, []); by.get(r.order).push(r); }
     const read = readAt ? Date.parse(readAt) : 0;
-    return (orders || []).map(o => {
+    return (orders || []).map(o0 => {
+      const o = mondayView(o0);
       const rs = by.get(o.id);
       if (!rs) return o;
       const st = (hub && hub[o.id]) || foldHub(rs);
@@ -98,19 +107,24 @@
       let backOut = false, latest = null, mismatch = false;
       for (const x of xs) {
         const want = x.received && PROBLEMS.includes(x.condition) ? [x.condition] : [];
-        now.push(...want);
-        if (!x.received) backOut = true; else if (!latest || String(x.at) > latest) latest = x.at;
+        if (x.received && (!latest || String(x.at) > latest)) latest = x.at;
         const ev = rs.find(r => r.id === x.event) || (x.event == null ? rs[rs.length - 1] : null);
         const sent = ev && ev.state === 'sent' && ev.sentAt && Date.parse(ev.sentAt) < read;
+        // Once the Hub's change has reached Monday (and Monday has been read since), a difference means someone changed it
+        // on Monday afterwards: Monday's newer tick or untick wins (11 Nov 2026). Before that, the Hub's change shows.
         if (x.id === 'order') {
-          if (sent && !!o.received !== !!x.received) mismatch = true;
+          if (sent && !!o.received !== !!x.received) { mismatch = true; continue; }
+          if (!x.received) backOut = true;
+          now.push(...want);
           n.received = !!x.received; n.receivedAt = x.received ? (o.receivedAt || x.at) : null;
           continue;
         }
         const i = n.items.find(y => y.id === x.id);
         if (!i) continue;
         const onMon = !!((o.items || []).find(y => y.id === x.id) || {}).received;
-        if (sent && onMon !== !!x.received) mismatch = true;
+        if (sent && onMon !== !!x.received) { mismatch = true; i.mondayWins = true; continue; }
+        if (!x.received) backOut = true;
+        now.push(...want);
         i.received = !!x.received;
         i.receivedAt = x.received ? (i.receivedAt || x.at) : null;
         i.issues = [...new Set([...i.issues.filter(b => !(x.labels || []).includes(b)), ...want])];
@@ -130,7 +144,7 @@
     });
   }
 
-  const api = { TZ, MISSING, PROBLEMS, londonDay, daysBetween, status, bucket, foldHub, applyReceipts };
+  const api = { TZ, MISSING, PROBLEMS, londonDay, daysBetween, status, bucket, foldHub, applyReceipts, mondayView };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.FLR_ORDER_RULES = api;
 })(typeof window !== 'undefined' ? window : globalThis);
