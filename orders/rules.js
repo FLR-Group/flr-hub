@@ -14,6 +14,9 @@
      only needs attention once that date has passed (Overdue). Shown, not flagged.
    - Date moved: moved later, but its first date hasn't come yet. Not late.
    - Received ticked on the order itself on Monday counts for all its materials.
+   - Cancelled (1.11): a delivery in "Cleared Deliveries" on Monday, or a material
+     with the Status label "Cancelled", is left out; so is one cancelled on the Hub
+     that Monday doesn't show yet. Moving it back on Monday brings it back.
    Once an order has fully arrived, neither "Delayed" nor "Date moved" applies;
    the order's history still shows the move.
    ========================================================================== */
@@ -144,7 +147,28 @@
     });
   }
 
-  const api = { TZ, MISSING, PROBLEMS, londonDay, daysBetween, status, bucket, foldHub, applyReceipts, mondayView };
+  /** Cancelled deliveries and materials (Order Tracker 1.11): Monday's "Cleared Deliveries" group and "Cancelled"
+   *  label, plus cancellations made on the Hub that Monday hasn't been read with since (still being written, or written
+   *  after the last read). A delivery whose every material is cancelled goes too. Cancelled materials stay on the order
+   *  as o.cancelled (name, and who/why when the Hub knows) for its details. */
+  const CANCELLED = 'Cancelled', CLEARED = 'Cleared Deliveries';
+  function applyCancels(orders, cancels, readAt) {
+    const read = readAt ? Date.parse(readAt) : 0;
+    const live = (cancels || []).filter(c => c.state !== 'sent' || !c.sentAt || Date.parse(c.sentAt) >= read);
+    const all = cancels || [];
+    const out = [];
+    for (const o of orders || []) {
+      if (o.group === CLEARED || live.some(c => c.order === o.id && c.line === 'order')) continue;
+      const why = id => [...all].reverse().find(c => c.order === o.id && c.line === id) || null;
+      const gone = (o.items || []).filter(i => (i.issues || []).includes(CANCELLED) || live.some(c => c.order === o.id && c.line === i.id));
+      if (!gone.length) { out.push(o); continue; }
+      if (gone.length === (o.items || []).length) continue;
+      out.push({ ...o, items: o.items.filter(i => !gone.includes(i)),
+        cancelled: gone.map(i => { const c = why(i.id); return { id: i.id, name: i.name, by: c && c.by, reason: c && c.reason, at: c && c.at }; }) });
+    }
+    return out;
+  }
+  const api = { TZ, MISSING, PROBLEMS, CANCELLED, londonDay, daysBetween, status, bucket, foldHub, applyReceipts, mondayView, applyCancels };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.FLR_ORDER_RULES = api;
 })(typeof window !== 'undefined' ? window : globalThis);

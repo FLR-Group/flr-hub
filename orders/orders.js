@@ -146,7 +146,7 @@
     return { label: 'Expected arrival', big: dayLong(o.day), small: timed(o) ? `at ${clock(o.at)}` : 'Time not confirmed', date: true };
   }
   /* ---------------------------------------------------------------- state and routes: #/today, #/upcoming, #/received, each with /<order id> */
-  const S = { data: null, gotAt: 0, err: null, busy: false, again: false, timer: 0, surveyors: null, photos: {}, answers: { replies: {}, seenAt: null }, tab: 'today', id: null, attnAll: false, scroll: {}, saving: new Map() };
+  const S = { data: null, gotAt: 0, err: null, busy: false, again: false, timer: 0, surveyors: null, photos: {}, answers: { replies: {}, seenAt: null }, cancels: [], tab: 'today', id: null, attnAll: false, scroll: {}, saving: new Map() };
   const TABS = [['today', 'Today', 'i-today'], ['upcoming', 'Coming up', 'i-calendar'], ['received', 'Received', 'i-inbox']];
   function parseRoute() {
     const p = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean);
@@ -173,7 +173,7 @@
   /* ---------------------------------------------------------------- the orders as shown: Monday's, plus Hub receipts Monday hasn't caught up with */
   let shownCache = null, shownFor = null;
   function shown() {
-    if (shownFor !== S.data) { shownCache = R.applyReceipts(S.data.orders, S.data.receipts || [], S.data.readAt, S.data.hub); shownFor = S.data; }
+    if (shownFor !== S.data) { shownCache = R.applyReceipts(R.applyCancels(S.data.orders, S.cancels, S.data.readAt), S.data.receipts || [], S.data.readAt, S.data.hub); shownFor = S.data; }
     return shownCache;
   }
   const findOrder = id => shown().find(o => o.id === id);
@@ -488,7 +488,12 @@
         latest ? note(latest, today) : null,
         null),
       h('ul', { class: 'ticks', 'aria-label': 'Materials: tick each one when it arrives' }, lines.map(i => tickRow(o, i, today))),
-      h('button', { class: 'od-problem', type: 'button', onclick: () => openProblem(o.id) }, icon('i-help'), 'Problem with a material? Contact the help line'),
+      (o.cancelled || []).length ? h('ul', { class: 'cx-list', 'aria-label': 'Cancelled materials' }, o.cancelled.map(c =>
+        h('li', { class: 'cx-item' }, h('span', { class: 'cx-name' }, product(c.name).title), h('span', { class: 'cx-why' },
+          ['Cancelled', c.by ? `by ${c.by === S.data.you ? 'you' : c.by}` : 'on monday.com', c.reason ? `· ${c.reason}` : ''].filter(Boolean).join(' '))))) : null,
+      h('div', { class: 'od-actions' },
+        h('button', { class: 'od-problem', type: 'button', onclick: () => openProblem(o.id) }, icon('i-help'), 'Problem with a material? Contact the help line'),
+        h('button', { class: 'od-cancel', type: 'button', onclick: () => openCancel(o) }, 'Cancel…')),
       problemsAbout(o, today),
       h('div', { class: 'folds' },
         fold('Order details', null, [h('dl', { class: 'meta' },
@@ -614,6 +619,56 @@
         return h('li', { class: 'prob' }, h('p', { class: 'prob-head' }, h('b', null, p.mine ? 'You' : p.by), h('span', null, when(p.at, today))),
           h('p', { class: 'prob-text' }, p.message), h('p', { class: `prob-st bub-st-${tone}` }, tone === 'ok' ? icon('i-check') : null, st), answerList(p, today));
       })));
+  }
+  /* ---------------------------------------------------------------- cancelling (1.11) */
+  // The whole delivery (it moves to Cleared Deliveries on monday.com) or one material (its Status becomes Cancelled),
+  // with a reason that goes on monday.com with the person's name. orders_cancel; flr-orders makes the change.
+  const CANCEL_WHY = ['Ordered by mistake', 'No longer needed', 'Supplier cancelled', 'Duplicate order'];
+  function openCancel(o) {
+    let pick = 'order', why = '';
+    const dlg = h('dialog', { class: 'rec cx', 'aria-labelledby': 'cx-title' });
+    const err = h('p', { class: 'rec-err', role: 'alert', hidden: true });
+    const list = h('ul', { class: 'rec-lines', role: 'radiogroup', 'aria-label': 'What to cancel' });
+    const chips = h('div', { class: 'rec-cond', role: 'group', 'aria-label': 'Reason' });
+    const box = h('textarea', { class: 'rec-note', rows: 2, maxlength: 300, placeholder: 'Or say why…', 'aria-label': 'Reason' });
+    const go = h('button', { class: 'btn btn-brand cx-go', type: 'submit' }, 'Cancel it');
+    const opt = (id, title, sub) => h('li', { class: 'rec-line' }, h('button', { type: 'button', class: 'rec-tick', role: 'radio', 'aria-checked': pick === id ? 'true' : 'false',
+      onclick: () => { pick = id; draw(); } }, h('span', { class: 'rec-box cx-dot', 'aria-hidden': 'true' }, pick === id ? icon('i-check') : null),
+      h('span', { class: 'rec-name' }, h('b', null, title), sub ? h('span', { class: 'rec-label-hint' }, sub) : null)));
+    function draw() {
+      list.replaceChildren(opt('order', 'The whole delivery', `${o.ref ? `Order ${o.ref} · ` : ''}moves to Cleared Deliveries on monday.com`),
+        ...((o.items || []).length > 1 ? (o.items || []).map(i => opt(i.id, product(i.name).title, i.received ? 'Already ticked as arrived' : 'Only this material')) : []));
+      chips.replaceChildren(...CANCEL_WHY.map(w => h('button', { type: 'button', class: 'rec-opt', 'aria-checked': why === w ? 'true' : 'false', onclick: () => { why = why === w ? '' : w; draw(); } }, w)));
+      go.disabled = !(box.value.trim() || why);
+      go.textContent = pick === 'order' ? 'Cancel the delivery' : 'Cancel this material';
+    }
+    const form = h('form', { class: 'rec-form', novalidate: true, onsubmit: async e => {
+      e.preventDefault(); err.hidden = true; go.disabled = true; go.setAttribute('aria-busy', 'true');
+      const reason = [why, box.value.trim()].filter(Boolean).join('. ');
+      try {
+        const { error } = await client().rpc('orders_cancel', { p_order: o.id, p_line: pick, p_reason: reason });
+        if (error) throw error;
+        dlg.close();
+        S.cancels = (await fetchCancels()) || S.cancels; shownFor = null; jobsFor = null;
+        await refresh(false);
+        toast(pick === 'order' ? 'Cancelled. It’s moving to Cleared Deliveries on monday.com.' : 'Cancelled. monday.com will show it as Cancelled.');
+      } catch (x) {
+        const code = flrCode(x);
+        err.textContent = code === 'FLR_VALIDATION' && x.details ? x.details : code === 'FLR_FORBIDDEN' ? 'You can’t cancel from the Order Tracker.' : offline(x) ? 'Can’t reach the FLR database. Nothing was cancelled; try again.' : 'That didn’t go through. Try again.';
+        err.hidden = false; go.removeAttribute('aria-busy'); draw();
+      }
+    } },
+      h('div', { class: 'rec-head' }, h('h2', { class: 'rec-title', id: 'cx-title' }, 'Cancel'),
+        h('button', { class: 'round rec-x', type: 'button', 'aria-label': 'Close without cancelling', onclick: () => dlg.close() }, icon('i-back'))),
+      h('p', { class: 'rec-job' }, o.job),
+      (o.items || []).length > 1 ? h('p', { class: 'rec-q' }, 'What’s cancelled?') : null, list,
+      h('p', { class: 'rec-q' }, 'Why?'), chips, box, err,
+      h('p', { class: 'rec-label-hint cx-note' }, 'Your name and the reason go on the delivery in monday.com.'), go);
+    box.addEventListener('input', draw);
+    dlg.append(form);
+    dlg.addEventListener('close', () => dlg.remove());
+    document.body.append(dlg);
+    draw(); dlg.showModal();
   }
   async function markAnswersSeen() {
     try {
@@ -794,6 +849,14 @@
     } catch (e) { return null; }
   }
   // Answers to problems from monday.com (1.9); until 1.9 is live, none.
+  // Cancellations made on the Hub (1.11); until 1.11 is live, none.
+  async function fetchCancels() {
+    try {
+      const { data, error } = await client().rpc('orders_cancels');
+      if (error) return missingFunction(error) ? [] : null;
+      return Array.isArray(data) ? data : [];
+    } catch (e) { return null; }
+  }
   async function fetchAnswers() {
     try {
       const { data, error } = await client().rpc('orders_problem_replies');
@@ -838,6 +901,7 @@
       const d = await fetchBoard();
       if (!S.surveyors) S.surveyors = await fetchSurveyors();
       S.answers = (await fetchAnswers()) || S.answers;
+      S.cancels = (await fetchCancels()) || S.cancels;
       S.data = d; S.gotAt = Date.now(); S.err = null;
       if (!d.readAt && !d.orders.length) gate('No deliveries yet', d.failing ? `The tracker couldn’t read monday.com yet. ${d.failing}` : 'The tracker hasn’t read the Goods In board yet. It does every minute.', { retry: true });
       else { render(); fetchPhotos().then(got => { if (got) render(); }); }

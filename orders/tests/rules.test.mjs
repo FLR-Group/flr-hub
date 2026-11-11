@@ -191,3 +191,20 @@ test("a Hub change that has reached Monday: a later tick or untick on Monday win
   const [notRead] = R.applyReceipts([o], [tick, { ...undo, sentAt: '2026-10-12T09:30:00Z' }], '2026-10-12T09:00:00Z');
   assert.equal(notRead.items[0].received, false, 'Monday not read since it was written: the Hub shows');
 });
+
+test('cancelled: Cleared Deliveries and "Cancelled" materials are left out; a Hub cancellation shows until Monday has been read since', () => {
+  const o = (id, extra = {}) => order({ id, items: [{ id: id + 'a', name: 'A', received: false, issues: [] }, { id: id + 'b', name: 'B', received: false, issues: [] }], ...extra });
+  const orders = [o('1'), o('2', { group: 'Cleared Deliveries' }), o('3'), o('4')];
+  orders[2].items[1].issues = ['Cancelled'];
+  const cancels = [
+    { order: '1', line: 'order', state: 'pending', by: 'Ola', reason: 'Not needed' },
+    { order: '4', line: '4a', state: 'sent', sentAt: '2026-10-12T09:00:00Z', by: 'Ola', reason: 'Wrong one' }];
+  const before = R.applyCancels(orders, cancels, '2026-10-12T08:59:00Z');
+  assert.deepEqual(before.map(x => x.id), ['3', '4']);
+  assert.deepEqual(before[0].items.map(i => i.id), ['3a']); assert.deepEqual(before[0].cancelled.map(c => c.name), ['B']);
+  assert.deepEqual(before[1].items.map(i => i.id), ['4b']); assert.equal(before[1].cancelled[0].reason, 'Wrong one');
+  const after = R.applyCancels(orders, cancels, '2026-10-12T09:05:00Z');
+  assert.deepEqual(after.find(x => x.id === '4').items.map(i => i.id), ['4a', '4b'], 'Monday read since and not labelled: someone put it back');
+  const allGone = R.applyCancels([o('5')], [{ order: '5', line: '5a', state: 'pending' }, { order: '5', line: '5b', state: 'pending' }], null);
+  assert.deepEqual(allGone, [], 'every material cancelled: the delivery goes too');
+});
