@@ -12,13 +12,13 @@
 <link rel="icon" href="../assets/flr-icon-192.png">
 <!-- the Hub's look, then this page's; the tools' slide, so Settings arrives from the right and Back slides the Hub in again -->
 <link rel="stylesheet" href="../hub.css?v=2.8">
-<link rel="stylesheet" href="settings.css?v=2.5">
+<link rel="stylesheet" href="settings.css?v=2.6">
 <link rel="stylesheet" href="../tool-transition.css">
 <script src="../flr-config.js"></script>
 <script src="../web-apps.js?v=2.0"></script>
 <script src="../vendor/supabase-2.116.0.js" defer></script>
 <script src="activity.js?v=1.2" defer></script>
-<script src="settings.js?v=2.9" defer></script>
+<script src="settings.js?v=3.0" defer></script>
 <script type="module" src="../assistant/assistant.js?v=2.4"></script>
 </head>
 <body data-view="loading">
@@ -272,18 +272,7 @@
         <p class="who-meta" id="ap-meta"></p>
       </div>
       <p class="ap-refused" id="ap-refused" hidden>This account wasn’t approved before. Approving it now switches it on.</p>
-      <h3 class="sub-title" id="ap-check-title">1. Check it’s really them</h3>
-      <p class="ap-lede">Use contact details FLR already holds. Never use a number, address or message that came with this sign-up.</p>
-      <div class="group ap-how" role="radiogroup" aria-labelledby="ap-check-title">
-        <label class="row ap-choice"><input type="radio" name="ap-how" value="phone"><span>I called them on their work number from the staff list</span></label>
-        <label class="row ap-choice"><input type="radio" name="ap-how" value="teams"><span>I messaged them on Teams, on their existing work account</span></label>
-        <label class="row ap-choice"><input type="radio" name="ap-how" value="it"><span>IT confirmed the person and the address</span></label>
-      </div>
-      <div class="group ap-note-group">
-        <label class="row" for="ap-note"><span class="row-label">Note</span><input id="ap-note" type="text" maxlength="500" autocomplete="off" placeholder="When and how; the IT ticket number if IT checked" aria-describedby="ap-note-hint"></label>
-      </div>
-      <p class="hint" id="ap-note-hint">Kept in the change log with your name and the time.</p>
-      <h3 class="sub-title">2. What they get</h3>
+      <h3 class="sub-title">What they get</h3>
       <div class="group">
         <div class="row row-static">
           <label class="row-main" for="ap-role"><span class="row-title">Role</span><span class="row-sub" id="ap-role-sub"></span></label>
@@ -292,11 +281,9 @@
       </div>
       <p class="ap-warn" id="ap-role-warn" hidden>A Super Admin can change every account, role and app setting, including yours.</p>
       <div class="group" id="ap-apps" role="group" aria-label="Tools"></div>
-      <label class="ap-tick"><input type="checkbox" id="ap-tick"><span id="ap-tick-label">I’ve checked who this is, using contact details FLR already holds.</span></label>
       <p class="form-error" id="ap-error" role="alert" hidden><svg aria-hidden="true"><use href="#i-alert"/></svg><span></span></p>
       <button class="btn btn-primary btn-block" type="submit" id="ap-submit" disabled><svg class="spin" aria-hidden="true"><use href="#i-spin"/></svg><span class="btn-label">Approve</span></button>
       <button class="btn btn-plain btn-block ap-refuse" type="button" id="ap-refuse">Don’t approve</button>
-      <p class="hint ap-foot">Approve stays greyed out until you’ve chosen how you checked, written a note and ticked the box.</p>
     </form>
   </div>
 </dialog>

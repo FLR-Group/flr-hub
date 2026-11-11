@@ -27,7 +27,6 @@
   const ICONS = { estimator: 'i-estimator', speeding: 'i-speeding', 'annual-leave': 'i-leave', fitters: 'i-fitters', orders: 'i-orders', capacity: 'i-capacity', proximity: 'i-proximity', warehouse: 'i-warehouse', surveyors: 'i-surveyors', market: 'i-market', maintenance: 'i-maintenance' };   // as on the Hub home
   const STATUS = { active: 'Active', disabled: 'Switched off' };
   const SHORT = { estimator: 'Estimator', speeding: 'Fleet', 'annual-leave': 'Leave', fitters: 'Fitters', orders: 'Orders', capacity: 'Planner', proximity: 'Nearby', warehouse: 'Warehouse', surveyors: 'Surveys', market: 'Market', maintenance: 'Maintenance' };
-  const CHECKED = { phone: 'checked by phone', teams: 'checked on Teams', it: 'checked by IT' };
   const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
   let sb = null;
@@ -1113,13 +1112,11 @@
     finally { btn.disabled = false; }
   }
 
-  /* ---------------------------------------------------------------- a new account: check who it is, then approve */
+  /* ---------------------------------------------------------------- a new account: approve it with a role and apps
+     Since Hub migration 3.1 there's no check question or note: approving is the role and the apps. */
   let approveFor = '';
   function apError(text) { const p = $('#ap-error'); p.querySelector('span').textContent = text; p.hidden = !text; }
-  function apReady() {
-    const how = document.querySelector('input[name="ap-how"]:checked');
-    $('#ap-submit').disabled = !(how && $('#ap-note').value.trim().length >= 5 && $('#ap-tick').checked);
-  }
+  function apReady() { $('#ap-submit').disabled = !approveFor; }
   function apRole() {
     const a = byId(approveFor), v = $('#ap-role').value, r = (a && a.request) || {};
     $('#ap-role-sub').textContent = `${r.notedRole === v ? 'Set up in advance. ' : ''}${ROLE_NOTE[v] || ''}`;
@@ -1133,9 +1130,6 @@
     $('#ap-email').textContent = a.email;
     $('#ap-meta').textContent = `Registered ${when(r.registeredAt)} · name typed: ${(a.name || '').trim() || 'none'}`;
     $('#ap-refused').hidden = r.decision !== 'refused';
-    for (const i of document.querySelectorAll('input[name="ap-how"]')) i.checked = false;
-    $('#ap-note').value = ''; $('#ap-tick').checked = false;
-    $('#ap-tick-label').textContent = `I’ve checked this is ${nameOf(a)}, using contact details FLR already holds.`;
     $('#ap-role').value = ROLES[r.notedRole] ? r.notedRole : 'estimator';
     apRole();
     // The tools: New accounts get, plus any already switched on for the address. Change them here if needed.
@@ -1164,15 +1158,15 @@
     e.preventDefault();
     const a = byId(approveFor), btn = $('#ap-submit');
     if (!a || btn.disabled || btn.getAttribute('aria-busy') === 'true') return;
-    const how = document.querySelector('input[name="ap-how"]:checked').value, role = $('#ap-role').value;
+    const role = $('#ap-role').value;
     const apps = [...document.querySelectorAll('#ap-apps .switch[data-ap-app]')].filter(b => b.getAttribute('aria-checked') === 'true').map(b => b.dataset.apApp);
     btn.setAttribute('aria-busy', 'true'); apError('');
     try {
-      await call('admin_approve_account', { p_user: a.id, p_checked_how: how, p_check_note: $('#ap-note').value.trim(), p_role: role, p_apps: apps });
+      await call('admin_approve_account', { p_user: a.id, p_role: role, p_apps: apps });
       sheets.close($('#sheet-approve'));
       await reloadAccounts();
       S.pre = await call('admin_preassigned_roles') || []; renderPre();
-      toast(`${nameOf(a)} approved as ${AS[role] || role}, ${CHECKED[how]}`);
+      toast(`${nameOf(a)} approved as ${AS[role] || role}`);
     } catch (err) { apError(said(err)); }
     finally { btn.removeAttribute('aria-busy'); }
   });

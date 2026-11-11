@@ -367,18 +367,10 @@ label.row{cursor:text}
 .roles-grid p{margin:0;color:var(--ink-2);font-size:14px;line-height:1.45}
 .roles-grid .rg-name{margin-bottom:3px;color:var(--ink);font-weight:650;font-size:15px}
 .roles-guide .hint{margin:10px 16px 14px}
-.ap-lede{margin:0 16px 8px;color:var(--ink-2);font-size:14.5px;line-height:1.4}
-.ap-choice{gap:12px;min-height:48px;cursor:pointer}
-.ap-choice input{flex:none;width:20px;height:20px;margin:0;accent-color:var(--tint-fill)}
-.ap-choice span{font-size:16px;line-height:1.3}
-.ap-note-group{margin-top:10px}
 .ap-warn{margin:8px 16px 0;color:var(--red);font-size:14px;line-height:1.4}
 .ap-refused{margin:0 0 6px;padding:10px 14px;border-radius:12px;background:var(--fill);color:var(--ink-2);font-size:14px;text-align:center}
 #ap-apps{margin-top:12px}
-.ap-tick{display:flex;align-items:flex-start;gap:12px;margin:18px 4px 14px;font-size:15.5px;line-height:1.4;cursor:pointer}
-.ap-tick input{flex:none;width:20px;height:20px;margin:1px 0 0;accent-color:var(--tint-fill)}
 .ap-refuse{margin-top:10px}
-.ap-foot{margin:10px 4px 0;text-align:center}
 
 @media (prefers-reduced-motion:reduce){
   .sheet .panel,.sheet .scrim,.switch,.switch .knob{transition:none}
