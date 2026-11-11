@@ -208,3 +208,36 @@ test('cancelled: Cleared Deliveries and "Cancelled" materials are left out; a Hu
   const allGone = R.applyCancels([o('5')], [{ order: '5', line: '5a', state: 'pending' }, { order: '5', line: '5b', state: 'pending' }], null);
   assert.deepEqual(allGone, [], 'every material cancelled: the delivery goes too');
 });
+
+test('1.12 undo: the Hub’s latest cancel or undo counts until monday.com is read after it’s written; then monday.com', () => {
+  const o = (id, group = 'Expected Deliveries', issuesB = []) => ({ id, job: 'JOB ' + id, group, items: [{ id: id + 'a', name: 'A', issues: [] }, { id: id + 'b', name: 'B', issues: issuesB }] });
+  // cancelled on monday.com (Cleared), undone on the Hub: back straight away, while monday.com still shows it Cleared
+  const undo = [{ id: 1, kind: 'restore', order: '1', line: 'order', state: 'pending', by: 'Ola' }];
+  assert.equal(R.applyCancels([o('1', 'Cleared Deliveries')], undo, '2026-10-12T09:00:00Z').length, 1);
+  assert.equal(R.cancelledList([o('1', 'Cleared Deliveries')], undo, '2026-10-12T09:00:00Z').length, 0);
+  // undo sent at 09:01, monday.com read at 09:02 and still Cleared (someone cleared it again): monday.com decides
+  const sent = [{ ...undo[0], state: 'sent', sentAt: '2026-10-12T09:01:00Z' }];
+  assert.equal(R.applyCancels([o('1', 'Cleared Deliveries')], sent, '2026-10-12T09:02:00Z').length, 0);
+  // a material: cancel then undo on the Hub; the cancel's who/why isn't shown for something brought back
+  const cu = [{ id: 1, kind: 'cancel', order: '2', line: '2b', state: 'sent', sentAt: '2026-10-12T08:00:00Z', by: 'Ola', reason: 'Not needed', at: '2026-10-12T07:59:00Z' },
+    { id: 2, kind: 'restore', order: '2', line: '2b', state: 'pending', by: 'Ola' }];
+  const back = R.applyCancels([o('2', 'Expected Deliveries', ['Cancelled'])], cu, '2026-10-12T08:30:00Z');
+  assert.deepEqual(back[0].items.map(i => i.id), ['2a', '2b']); assert.equal(back[0].cancelled, undefined);
+  assert.equal(R.cancelState(o('2', 'Expected Deliveries', ['Cancelled']), '2b', cu, '2026-10-12T08:30:00Z'), false);
+  assert.equal(R.cancelState(o('2', 'Expected Deliveries', ['Cancelled']), '2b', cu.slice(0, 1), '2026-10-12T08:30:00Z'), true);
+});
+
+test('1.12 Cancelled tab: deliveries and materials cancelled now, newest first, Hub who/why, monday.com-only ones, gone ones kept', () => {
+  const orders = [
+    { id: '1', job: 'ONE', group: 'Cleared Deliveries', updatedAt: '2026-10-11T10:00:00Z', items: [{ id: '1a', name: 'A', issues: ['Cancelled'] }] },
+    { id: '2', job: 'TWO', group: 'Expected Deliveries', items: [{ id: '2a', name: 'A', issues: [] }, { id: '2b', name: 'B', issues: ['Cancelled'] }] },
+    { id: '3', job: 'THREE', group: 'Expected Deliveries', items: [{ id: '3a', name: 'A', issues: [] }] }];
+  const cancels = [
+    { id: 1, kind: 'cancel', order: '2', line: '2b', name: 'B', job: 'TWO', by: 'Ola', reason: 'Duplicate order', at: '2026-10-12T08:00:00Z', state: 'sent', sentAt: '2026-10-12T08:00:30Z' },
+    { id: 2, kind: 'cancel', order: '9', line: 'order', name: 'NINE', job: 'NINE', by: 'Sam', reason: 'Ordered by mistake', at: '2026-10-10T08:00:00Z', state: 'sent', sentAt: '2026-10-10T08:00:30Z' },
+    { id: 3, kind: 'cancel', order: '3', line: '3a', name: 'A', job: 'THREE', by: 'Ola', reason: 'x', at: '2026-10-12T09:00:00Z', state: 'pending' }];
+  const list = R.cancelledList(orders, cancels, '2026-10-12T08:30:00Z');
+  assert.deepEqual(list.map(c => [c.order, c.line]), [['3', '3a'], ['2', '2b'], ['1', 'order'], ['9', 'order']]);
+  assert.deepEqual([list[0].pending, list[1].by, list[1].reason, list[2].by, list[3].gone], [true, 'Ola', 'Duplicate order', null, true]);
+  assert.ok(!list.some(c => c.line === '1a'), 'a material on a cancelled delivery isn’t listed on its own');
+});

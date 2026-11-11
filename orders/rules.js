@@ -152,23 +152,54 @@
    *  after the last read). A delivery whose every material is cancelled goes too. Cancelled materials stay on the order
    *  as o.cancelled (name, and who/why when the Hub knows) for its details. */
   const CANCELLED = 'Cancelled', CLEARED = 'Cleared Deliveries';
+  // Cancelled or not (1.12), for the whole delivery (line 'order') or one material: the Hub's latest cancel or undo
+  // ("restore") counts until flr-orders has written it to monday.com and monday.com has been read since; after that
+  // monday.com decides (the delivery in Cleared Deliveries, the material's Status Cancelled).
+  const isLive = (c, read) => c.state !== 'sent' || !c.sentAt || Date.parse(c.sentAt) >= read;
+  function lastHub(cancels, order, line) { let e = null; for (const c of cancels || []) if (c.order === order && c.line === line) e = c; return e; }
+  function cancelState(o, line, cancels, readAt) {
+    const e = lastHub(cancels, o.id, line);
+    if (e && isLive(e, readAt ? Date.parse(readAt) : 0)) return e.kind !== 'restore';
+    if (line === 'order') return o.group === CLEARED;
+    const i = (o.items || []).find(x => x.id === line);
+    return !!i && (i.issues || []).includes(CANCELLED);
+  }
+  // Who cancelled it and why: the Hub's latest cancel of it (none when it was cancelled on monday.com).
+  const lastCancel = (cancels, order, line) => { let e = null; for (const c of cancels || []) if (c.order === order && c.line === line) e = c.kind === 'restore' ? null : c; return e; };
   function applyCancels(orders, cancels, readAt) {
-    const read = readAt ? Date.parse(readAt) : 0;
-    const live = (cancels || []).filter(c => c.state !== 'sent' || !c.sentAt || Date.parse(c.sentAt) >= read);
-    const all = cancels || [];
     const out = [];
     for (const o of orders || []) {
-      if (o.group === CLEARED || live.some(c => c.order === o.id && c.line === 'order')) continue;
-      const why = id => [...all].reverse().find(c => c.order === o.id && c.line === id) || null;
-      const gone = (o.items || []).filter(i => (i.issues || []).includes(CANCELLED) || live.some(c => c.order === o.id && c.line === i.id));
+      if (cancelState(o, 'order', cancels, readAt)) continue;
+      const gone = (o.items || []).filter(i => cancelState(o, i.id, cancels, readAt));
       if (!gone.length) { out.push(o); continue; }
       if (gone.length === (o.items || []).length) continue;
       out.push({ ...o, items: o.items.filter(i => !gone.includes(i)),
-        cancelled: gone.map(i => { const c = why(i.id); return { id: i.id, name: i.name, by: c && c.by, reason: c && c.reason, at: c && c.at }; }) });
+        cancelled: gone.map(i => { const c = lastCancel(cancels, o.id, i.id); return { id: i.id, name: i.name, by: c && c.by, reason: c && c.reason, at: c && c.at }; }) });
     }
     return out;
   }
-  const api = { TZ, MISSING, PROBLEMS, CANCELLED, CLEARED, londonDay, daysBetween, status, bucket, foldHub, applyReceipts, mondayView, applyCancels };
+  // Everything cancelled now, newest first: deliveries (line 'order') and materials on deliveries that aren't cancelled
+  // as a whole. Hub cancels of deliveries no longer on the board are kept (gone: true) so they can still be seen.
+  function cancelledList(orders, cancels, readAt) {
+    const out = [], seen = new Set();
+    const add = (o, line, name) => { const c = lastCancel(cancels, o.id, line); seen.add(o.id + '/' + line);
+      out.push({ order: o.id, line, job: o.job || (c && c.job) || '', name, ref: o.ref || null, url: o.url || null,
+        by: c ? c.by : null, reason: c ? c.reason : null, at: c ? c.at : (line === 'order' ? o.updatedAt || null : null),
+        pending: !!c && isLive(c, readAt ? Date.parse(readAt) : 0) }); };
+    for (const o of orders || []) {
+      if (cancelState(o, 'order', cancels, readAt)) { add(o, 'order', null); continue; }
+      for (const i of o.items || []) if (cancelState(o, i.id, cancels, readAt)) add(o, i.id, i.name);
+    }
+    const ids = new Set((orders || []).map(o => o.id));
+    for (const c of cancels || []) {
+      if (ids.has(c.order) || seen.has(c.order + '/' + c.line)) continue;
+      const e = lastHub(cancels, c.order, c.line);
+      if (e && e.kind !== 'restore' && e === c) { seen.add(c.order + '/' + c.line);
+        out.push({ order: c.order, line: c.line, job: c.job, name: c.line === 'order' ? null : c.name, ref: null, url: null, by: c.by, reason: c.reason, at: c.at, pending: false, gone: true }); }
+    }
+    return out.sort((a, b) => String(b.at || '').localeCompare(String(a.at || '')));
+  }
+  const api = { TZ, MISSING, PROBLEMS, CANCELLED, CLEARED, londonDay, daysBetween, status, bucket, foldHub, applyReceipts, mondayView, applyCancels, cancelState, cancelledList };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.FLR_ORDER_RULES = api;
 })(typeof window !== 'undefined' ? window : globalThis);

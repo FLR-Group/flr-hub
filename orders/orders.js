@@ -12,7 +12,7 @@
    The rules (delayed, date moved, overdue, part received) are in rules.js.
 
    Screens: Today (due today, with a "Needs attention" strip for late orders),
-   Coming up, Received. A tapped order opens on its own on a phone, and beside
+   Coming up, Received, Cancelled (1.12). A tapped order opens on its own on a phone, and beside
    the list on a wide screen.
    ========================================================================== */
 (function () {
@@ -145,9 +145,9 @@
     if (s.kind === 'today') return timed(o) ? { label: 'Expected today at', big: clock(o.at), small: null } : { label: null, big: 'Due today', small: 'Time not confirmed' };
     return { label: 'Expected arrival', big: dayLong(o.day), small: timed(o) ? `at ${clock(o.at)}` : 'Time not confirmed', date: true };
   }
-  /* ---------------------------------------------------------------- state and routes: #/today, #/upcoming, #/received, each with /<order id> */
+  /* ---------------------------------------------------------------- state and routes: #/today, #/upcoming, #/received, #/cancelled, each with /<order id> */
   const S = { data: null, gotAt: 0, err: null, busy: false, again: false, timer: 0, surveyors: null, photos: {}, answers: { replies: {}, seenAt: null }, cancels: [], tab: 'today', id: null, attnAll: false, scroll: {}, saving: new Map() };
-  const TABS = [['today', 'Today', 'i-today'], ['upcoming', 'Coming up', 'i-calendar'], ['received', 'Received', 'i-inbox']];
+  const TABS = [['today', 'Today', 'i-today'], ['upcoming', 'Coming up', 'i-calendar'], ['received', 'Received', 'i-inbox'], ['cancelled', 'Cancelled', 'i-cancel']];
   function parseRoute() {
     const p = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean);
     if (p[0] === 'order' && p[1]) return { tab: 'today', id: decodeURIComponent(p[1]) };   // links from earlier versions
@@ -386,40 +386,37 @@
       g.nodate.length ? h('section', { class: 'block' }, h('h2', { class: 'block-title' }, 'No date yet'), grouped(g.nodate, today, { upcoming: true })) : null,
     ];
   }
-  // Everything cancelled in the last 60 days (1.11): on the Hub (who, why, when) and straight on monday.com (a delivery in
-  // Cleared Deliveries, a material labelled Cancelled). Newest first.
-  function cancelledAll() {
-    const hub = [...(S.cancels || [])].reverse().map(c => ({ order: c.order, line: c.line, job: c.job, name: c.line === 'order' ? null : c.name, by: c.by, reason: c.reason, at: c.at }));
-    const has = (o, line) => hub.some(c => c.order === o && c.line === line);
-    const mon = [];
-    for (const o of (S.data && S.data.orders) || []) {
-      if (o.group === R.CLEARED && !has(o.id, 'order')) mon.push({ order: o.id, line: 'order', job: o.job, name: null, url: o.url, at: o.updatedAt });
-      for (const i of o.items || []) if ((i.issues || []).includes(R.CANCELLED) && !has(o.id, i.id) && o.group !== R.CLEARED) mon.push({ order: o.id, line: i.id, job: o.job, name: i.name, url: o.url, at: null });
-    }
-    return [...hub, ...mon];
-  }
-  function cancelledSection(today) {
-    const all = cancelledAll();
-    if (!all.length) return null;
-    return h('section', { class: 'block cx-block' }, fold('Cancelled', all.length, h('ul', { class: 'cx-all' }, all.map(c => {
+  // The Cancelled tab (1.12): everything cancelled now, on the Hub (who, why, when) or straight on monday.com (a delivery in
+  // Cleared Deliveries, a material labelled Cancelled), newest first, each with Undo (orders_restore).
+  const cancelledNow = () => R.cancelledList(S.data.orders, S.cancels, S.data.readAt);
+  function cancelledScreen(today) {
+    const all = cancelledNow();
+    if (!all.length) return [empty('Nothing cancelled'), h('p', { class: 'cx-hint' }, 'Cancel a delivery, or one material on it, from the delivery itself. It shows here, with Undo.')];
+    return h('section', { class: 'block' }, h('ul', { class: 'cx-all' }, all.map(c => {
       const o = (S.data.orders || []).find(x => x.id === c.order);
       const job = c.line !== 'order' && o ? findJob(o.id) : null;
       const who = c.by ? `Cancelled by ${c.by === S.data.you ? 'you' : c.by}${c.at ? `, ${when(c.at, today)}` : ''}` : 'Cancelled on monday.com';
-      const body = [h('span', { class: 'cx-job' }, c.job || 'Delivery'), h('span', { class: 'cx-what' }, c.line === 'order' ? `The whole delivery${o && o.ref ? ` · Order ${o.ref}` : ''}` : product(c.name || '').title),
-        h('span', { class: 'cx-why' }, [who, c.reason].filter(Boolean).join(' · '))];
-      return h('li', null, job ? h('a', { class: 'cx-row', href: href('received', job.key) }, ...body)
-        : (c.url || (o && o.url)) ? h('a', { class: 'cx-row', href: c.url || o.url, target: '_blank', rel: 'noopener' }, ...body, h('span', { class: 'cx-mon' }, 'Open in monday.com', icon('i-external')))
-        : h('div', { class: 'cx-row' }, ...body));
-    }))));
+      const url = c.url || (o && o.url);
+      return h('li', { class: 'cx-row' },
+        h('div', { class: 'cx-main' },
+          h('span', { class: 'cx-job' }, c.job || 'Delivery'),
+          h('span', { class: 'cx-what' }, c.line === 'order' ? `The whole delivery${c.ref ? ` · Order ${c.ref}` : ''}` : product(c.name || '').title),
+          h('span', { class: 'cx-why' }, [who, c.reason].filter(Boolean).join(' · ')),
+          c.pending ? h('span', { class: 'cx-pending' }, 'Going to monday.com…') : null,
+          h('span', { class: 'cx-links' },
+            job ? h('a', { class: 'cx-mon', href: href('cancelled', job.key) }, 'Open the job', icon('i-chevron')) : null,
+            url ? h('a', { class: 'cx-mon', href: url, target: '_blank', rel: 'noopener' }, 'Open in monday.com', icon('i-external')) : null)),
+        c.gone ? h('span', { class: 'cx-gone' }, 'No longer on the board')
+          : h('button', { class: 'cx-undo', type: 'button', 'aria-label': `Undo: bring back ${c.line === 'order' ? `the delivery for ${c.job}` : product(c.name || '').title}`, onclick: () => openUndo(c) }, icon('i-undo'), 'Undo'));
+    })));
   }
   function receivedScreen(g, today) {
     const earlier = [...new Set(g.gotEarlier.map(x => x.s.recDay || ''))];
-    if (!g.gotToday.length && !earlier.length) return [empty('Nothing received yet'), cancelledSection(today)];
+    if (!g.gotToday.length && !earlier.length) return empty('Nothing received yet');
     return [
       h('section', { class: 'block' }, h('h2', { class: 'block-title' }, 'Today'), g.gotToday.length ? list(g.gotToday, today, {}) : empty('Nothing received yet today')),
       earlier.map(d => h('section', { class: 'block' }, h('h2', { class: 'block-title' }, d ? (daysBetween(d, today) === 1 ? 'Yesterday' : dayLong(d)) : 'Date not recorded'),
         list(g.gotEarlier.filter(x => (x.s.recDay || '') === d), today, {}))),
-      cancelledSection(today),
     ];
   }
 
@@ -516,8 +513,9 @@
         null),
       h('ul', { class: 'ticks', 'aria-label': 'Materials: tick each one when it arrives' }, lines.map(i => tickRow(o, i, today))),
       (o.cancelled || []).length ? h('ul', { class: 'cx-list', 'aria-label': 'Cancelled materials' }, o.cancelled.map(c =>
-        h('li', { class: 'cx-item' }, h('span', { class: 'cx-name' }, product(c.name).title), h('span', { class: 'cx-why' },
-          ['Cancelled', c.by ? `by ${c.by === S.data.you ? 'you' : c.by}` : 'on monday.com', c.reason ? `· ${c.reason}` : ''].filter(Boolean).join(' '))))) : null,
+        h('li', { class: 'cx-item' }, h('div', { class: 'cx-main' }, h('span', { class: 'cx-name' }, product(c.name).title), h('span', { class: 'cx-why' },
+          ['Cancelled', c.by ? `by ${c.by === S.data.you ? 'you' : c.by}` : 'on monday.com', c.reason ? `· ${c.reason}` : ''].filter(Boolean).join(' '))),
+          h('button', { class: 'cx-undo', type: 'button', 'aria-label': `Undo: bring back ${product(c.name).title}`, onclick: () => openUndo({ order: o.id, line: c.id, job: o.job, name: c.name }) }, icon('i-undo'), 'Undo')))) : null,
       h('div', { class: 'od-actions' },
         h('button', { class: 'od-problem', type: 'button', onclick: () => openProblem(o.id) }, icon('i-help'), 'Problem with a material? Contact the help line'),
         h('button', { class: 'od-cancel', type: 'button', onclick: () => openCancel(o) }, 'Cancel…')),
@@ -697,6 +695,41 @@
     document.body.append(dlg);
     draw(); dlg.showModal();
   }
+  // Undo a cancellation (1.12): the delivery goes back to Expected Deliveries (Received Deliveries if it's ticked as
+  // received) or the material loses "Cancelled" on its Status. orders_restore; flr-orders makes the change.
+  function openUndo(c) {
+    const whole = c.line === 'order';
+    const dlg = h('dialog', { class: 'rec cx cx-undo-dlg', 'aria-labelledby': 'cxu-title' });
+    const err = h('p', { class: 'rec-err', role: 'alert', hidden: true });
+    const go = h('button', { class: 'btn btn-brand', type: 'submit' }, 'Bring it back');
+    const form = h('form', { class: 'rec-form', novalidate: true, onsubmit: async e => {
+      e.preventDefault(); err.hidden = true; go.disabled = true; go.setAttribute('aria-busy', 'true');
+      try {
+        const { error } = await client().rpc('orders_restore', { p_order: c.order, p_line: c.line });
+        if (error) throw error;
+        dlg.close();
+        S.cancels = (await fetchCancels()) || S.cancels; shownFor = null; jobsFor = null;
+        await refresh(false);
+        toast(whole ? 'Brought back. It’s moving back to Expected Deliveries on monday.com.' : 'Brought back. “Cancelled” is coming off it on monday.com.');
+      } catch (x) {
+        const code = flrCode(x);
+        err.textContent = (code === 'FLR_VALIDATION' || code === 'FLR_NOT_FOUND') && x.details ? x.details : code === 'FLR_FORBIDDEN' ? 'You can’t change the Order Tracker.' : missingFunction(x) ? 'Undo isn’t switched on yet.' : offline(x) ? 'Can’t reach the FLR database. Nothing changed; try again.' : 'That didn’t go through. Try again.';
+        err.hidden = false; go.disabled = false; go.removeAttribute('aria-busy');
+      }
+    } },
+      h('div', { class: 'rec-head' }, h('h2', { class: 'rec-title', id: 'cxu-title' }, 'Undo the cancellation?'),
+        h('button', { class: 'round rec-x', type: 'button', 'aria-label': 'Close without changing anything', onclick: () => dlg.close() }, icon('i-back'))),
+      h('p', { class: 'rec-job' }, c.job || 'Delivery'),
+      h('p', { class: 'cx-undo-what' }, whole ? 'The whole delivery' : product(c.name || '').title),
+      h('p', { class: 'rec-label-hint cx-note' }, whole
+        ? 'It goes back on the tracker and moves back to Expected Deliveries on monday.com (Received Deliveries if it’s ticked as received). Your name goes on the delivery in monday.com.'
+        : 'It goes back on the delivery and “Cancelled” comes off its Status on monday.com. Your name goes on the delivery in monday.com.'),
+      err, go);
+    dlg.append(form);
+    dlg.addEventListener('close', () => dlg.remove());
+    document.body.append(dlg);
+    dlg.showModal();
+  }
   async function markAnswersSeen() {
     try {
       const { data, error } = await client().rpc('orders_replies_seen');
@@ -807,11 +840,11 @@
     const today = londonDay(), g = sorted(today);
     // On a wide screen the panel is never empty: the address's order if there is one, otherwise the first of this
     // view (Today: due today, then needs attention, then any order). Not called "next": the board doesn't know the order.
-    const first = { today: [g.due, g.late, g.upcoming, g.nodate, g.gotToday, g.gotEarlier], upcoming: [g.upcoming, g.nodate], received: [g.gotToday, g.gotEarlier] }[S.tab]
+    const first = { today: [g.due, g.late, g.upcoming, g.nodate, g.gotToday, g.gotEarlier], upcoming: [g.upcoming, g.nodate], received: [g.gotToday, g.gotEarlier], cancelled: [] }[S.tab]
       .map(l => l[0]).find(Boolean);
     S.id = r.id || (wide.matches && first ? jobKey(first.o) : null);
     // Today's badge: jobs with materials still to come that are due today. "Needs attention" has its own count.
-    const counts = { today: jobCount(g.due), upcoming: jobCount([...g.upcoming, ...g.nodate]), received: jobCount(g.gotToday, false) };
+    const counts = { today: jobCount(g.due), upcoming: jobCount([...g.upcoming, ...g.nodate]), received: jobCount(g.gotToday, false), cancelled: cancelledNow().length };
     const job = findJob(S.id);
     if (job && S.id !== job.key) S.id = job.key;   // an old link to one order opens its job
     const v = $('#view');
@@ -833,10 +866,10 @@
       document.title = `${job ? job.name : 'Job'} · Order Tracker`;
       v.replaceChildren(h('div', { class: 'solo' }, notices(today), job ? jobView(job, today, { back: true }) : missing));
     } else {
-      const titles = { today: ['Today’s deliveries', dayLong(today)], upcoming: ['Coming up', 'After today'], received: ['Received', 'Recorded on the Hub or monday.com'] };
+      const titles = { today: ['Today’s deliveries', dayLong(today)], upcoming: ['Coming up', 'After today'], received: ['Received', 'Recorded on the Hub or monday.com'], cancelled: ['Cancelled', 'On the Hub or monday.com · Undo brings it back'] };
       const [title, sub] = titles[S.tab];
       document.title = `${title} · Order Tracker`;
-      const body = S.tab === 'today' ? todayScreen(g, today) : S.tab === 'upcoming' ? upcomingScreen(g, today) : receivedScreen(g, today);
+      const body = S.tab === 'today' ? todayScreen(g, today) : S.tab === 'upcoming' ? upcomingScreen(g, today) : S.tab === 'cancelled' ? cancelledScreen(today) : receivedScreen(g, today);
       const listCol = h('div', { class: 'col-list' }, header(title, sub, counts, today), notices(today), h('div', { class: 'col-body' }, body));
       v.replaceChildren(wide.matches ? h('div', { class: 'split' }, listCol,
         h('aside', { class: 'col-detail', 'aria-label': 'Selected job' }, job ? jobView(job, today) : missing || placeholder())) : listCol);
