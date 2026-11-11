@@ -386,13 +386,40 @@
       g.nodate.length ? h('section', { class: 'block' }, h('h2', { class: 'block-title' }, 'No date yet'), grouped(g.nodate, today, { upcoming: true })) : null,
     ];
   }
+  // Everything cancelled in the last 60 days (1.11): on the Hub (who, why, when) and straight on monday.com (a delivery in
+  // Cleared Deliveries, a material labelled Cancelled). Newest first.
+  function cancelledAll() {
+    const hub = [...(S.cancels || [])].reverse().map(c => ({ order: c.order, line: c.line, job: c.job, name: c.line === 'order' ? null : c.name, by: c.by, reason: c.reason, at: c.at }));
+    const has = (o, line) => hub.some(c => c.order === o && c.line === line);
+    const mon = [];
+    for (const o of (S.data && S.data.orders) || []) {
+      if (o.group === R.CLEARED && !has(o.id, 'order')) mon.push({ order: o.id, line: 'order', job: o.job, name: null, url: o.url, at: o.updatedAt });
+      for (const i of o.items || []) if ((i.issues || []).includes(R.CANCELLED) && !has(o.id, i.id) && o.group !== R.CLEARED) mon.push({ order: o.id, line: i.id, job: o.job, name: i.name, url: o.url, at: null });
+    }
+    return [...hub, ...mon];
+  }
+  function cancelledSection(today) {
+    const all = cancelledAll();
+    if (!all.length) return null;
+    return h('section', { class: 'block cx-block' }, fold('Cancelled', all.length, h('ul', { class: 'cx-all' }, all.map(c => {
+      const o = (S.data.orders || []).find(x => x.id === c.order);
+      const job = c.line !== 'order' && o ? findJob(o.id) : null;
+      const who = c.by ? `Cancelled by ${c.by === S.data.you ? 'you' : c.by}${c.at ? `, ${when(c.at, today)}` : ''}` : 'Cancelled on monday.com';
+      const body = [h('span', { class: 'cx-job' }, c.job || 'Delivery'), h('span', { class: 'cx-what' }, c.line === 'order' ? `The whole delivery${o && o.ref ? ` · Order ${o.ref}` : ''}` : product(c.name || '').title),
+        h('span', { class: 'cx-why' }, [who, c.reason].filter(Boolean).join(' · '))];
+      return h('li', null, job ? h('a', { class: 'cx-row', href: href('received', job.key) }, ...body)
+        : (c.url || (o && o.url)) ? h('a', { class: 'cx-row', href: c.url || o.url, target: '_blank', rel: 'noopener' }, ...body, h('span', { class: 'cx-mon' }, 'Open in monday.com', icon('i-external')))
+        : h('div', { class: 'cx-row' }, ...body));
+    }))));
+  }
   function receivedScreen(g, today) {
     const earlier = [...new Set(g.gotEarlier.map(x => x.s.recDay || ''))];
-    if (!g.gotToday.length && !earlier.length) return [empty('Nothing received yet')];
+    if (!g.gotToday.length && !earlier.length) return [empty('Nothing received yet'), cancelledSection(today)];
     return [
       h('section', { class: 'block' }, h('h2', { class: 'block-title' }, 'Today'), g.gotToday.length ? list(g.gotToday, today, {}) : empty('Nothing received yet today')),
       earlier.map(d => h('section', { class: 'block' }, h('h2', { class: 'block-title' }, d ? (daysBetween(d, today) === 1 ? 'Yesterday' : dayLong(d)) : 'Date not recorded'),
         list(g.gotEarlier.filter(x => (x.s.recDay || '') === d), today, {}))),
+      cancelledSection(today),
     ];
   }
 

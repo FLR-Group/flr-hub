@@ -168,7 +168,7 @@
     }
     return out;
   }
-  const api = { TZ, MISSING, PROBLEMS, CANCELLED, londonDay, daysBetween, status, bucket, foldHub, applyReceipts, mondayView, applyCancels };
+  const api = { TZ, MISSING, PROBLEMS, CANCELLED, CLEARED, londonDay, daysBetween, status, bucket, foldHub, applyReceipts, mondayView, applyCancels };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.FLR_ORDER_RULES = api;
 })(typeof window !== 'undefined' ? window : globalThis);
