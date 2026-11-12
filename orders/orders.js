@@ -518,7 +518,7 @@
           h('button', { class: 'cx-undo', type: 'button', 'aria-label': `Undo: bring back ${product(c.name).title}`, onclick: () => openUndo({ order: o.id, line: c.id, job: o.job, name: c.name }) }, icon('i-undo'), 'Undo')))) : null,
       h('div', { class: 'od-actions' },
         h('button', { class: 'od-problem', type: 'button', onclick: () => openProblem(o.id) }, icon('i-help'), 'Problem with a material? Contact the help line'),
-        h('button', { class: 'od-cancel', type: 'button', onclick: () => openCancel(o) }, 'Cancel…')),
+        h('button', { class: 'od-cancel', type: 'button', onclick: () => openCancel(o) }, icon('i-cancel'), 'Cancel…')),
       problemsAbout(o, today),
       h('div', { class: 'folds' },
         fold('Order details', null, [h('dl', { class: 'meta' },
