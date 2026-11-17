@@ -164,6 +164,8 @@
   // The person who raised it has written since a handler last did.
   const lastReply = r => { const t = r.timeline || []; return t.length > 1 && t[t.length - 1].kind === 'reply'; };
   const ORDER = { waiting: 0, submitted: 1, progress: 1, resolved: 2 };
+  // Their own reports whose status a handler changed since they last opened it (Maintenance 1.3; absent before).
+  const reviewedIds = () => (home && Array.isArray(home.reviewed) ? home.reviewed : []);
   function reportRow(r, o = {}) {
     const li = el('li');
     const b = el('button', 'report' + (r.id === newId ? ' is-new' : '')); b.type = 'button'; b.dataset.id = r.id;
@@ -175,6 +177,7 @@
     parts.push(el('span', '', CATS[r.category].name), el('span', '', `Raised ${lower(day(r.raised))}`));
     if (o.handler && r.impact === 'blocked' && r.status !== 'resolved') parts.push(el('span', 'r-blocked', 'Unable to work'));
     if (!o.handler && r.status === 'waiting') parts.push(el('span', 'r-need', 'Reply needed'));
+    if (!o.handler && reviewedIds().includes(r.id)) parts.push(el('span', 'r-need', 'Reviewed'));
     if (o.handler && r.status !== 'resolved' && lastReply(r)) parts.push(el('span', 'r-need', 'New reply'));
     parts.forEach((p, i) => { if (i) meta.append(el('span', 'dot', '·')); meta.append(p); });
     text.append(el('span', 'r-title', r.title), meta);
@@ -739,6 +742,13 @@
     const r = find(id, asHandler);
     if (!r) { if (!o.keep) toast('That report isn’t there any more.'); return; }
     shown = { id, handler: asHandler };
+    // Opening their own reviewed report: it's seen, so the Hub stops saying so.
+    if (!asHandler && reviewedIds().includes(id)) {
+      home.reviewed = reviewedIds().filter(x => x !== id);
+      try { sessionStorage.removeItem('flr-hub:attention'); } catch (e) { /* ignore */ }
+      call('maintenance_seen', { p_id: id }).catch(() => { /* next time, then */ });
+      renderMine();
+    }
     const d = $('#detail'); const scroll = d.scrollTop;
     const top = el('div', 'd-top'); top.append(badge(r.status), el('span', 'd-ref', r.ref));
     const facts = el('dl', 'd-facts');

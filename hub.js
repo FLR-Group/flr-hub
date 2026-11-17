@@ -492,6 +492,12 @@
         short: `${plural(n, 'new problem', 'new problems')}`, sub: 'Maintenance · waiting to be picked up', subShort: 'Maintenance' });
       if (w) lines.push({ app: 'maintenance', href: mtUrl, title: `${plural(w, 'report of yours needs', 'reports of yours need')} a reply`,
         short: `${plural(w, 'report needs', 'reports need')} a reply`, sub: 'Maintenance · someone asked for more information', subShort: 'Maintenance' });
+      // A handler has changed the status of a problem they reported, and they haven't opened it since.
+      const rv = Array.isArray(mt.reviewed) ? mt.reviewed : [];
+      if (rv.length) lines.push({ app: 'maintenance', href: mtUrl + (rv.length === 1 && SAME_SITE.test(mtUrl) ? `#MNT-${rv[0]}` : ''),
+        title: rv.length === 1 ? 'Someone has reviewed your problem' : `Someone has reviewed ${rv.length} of your problems`,
+        short: rv.length === 1 ? 'Your problem was reviewed' : `${rv.length} problems reviewed`,
+        sub: rv.length === 1 ? 'Maintenance · its status has changed' : 'Maintenance · their status has changed', subShort: 'Maintenance' });
     }
     // Whether anything could ever be listed for this person: if not, there's no panel at all.
     const possible = !!((leave && leaveUrl) || (fleet && fleetUrl) || (drafts && estUrl) || a.accounts || (mt && mtUrl));
@@ -528,7 +534,7 @@
       ['estimator', a.drafts ? count(a.drafts.empty) : 0, k => plural(k, 'empty draft', 'empty drafts')],
       ['speeding', fleetN, () => [count(a.fleet.action) ? `${count(a.fleet.action)} overdue` : '', count(a.fleet.check) ? `${count(a.fleet.check)} need${count(a.fleet.check) === 1 ? 's' : ''} checking` : ''].filter(Boolean).join(', ')],
       ['annual-leave', a.leave ? count(a.leave.waiting) : 0, k => `${k} waiting for a decision`],
-      ['maintenance', a.maintenance ? count(a.maintenance.newReports) + count(a.maintenance.replyNeeded) : 0, k => plural(k, 'problem needs you', 'problems need you')],
+      ['maintenance', a.maintenance ? count(a.maintenance.newReports) + count(a.maintenance.replyNeeded) + (Array.isArray(a.maintenance.reviewed) ? a.maintenance.reviewed.length : 0) : 0, k => plural(k, 'problem needs you', 'problems need you')],
     ];
     for (const [id, k, say] of marks) {
       const li = k ? tilesEl.querySelector(`.tile[data-id="${id}"]`) : null;
@@ -629,6 +635,7 @@
     const m = mr && !mr.error && mr.data && Array.isArray(mr.data.reports) ? {
       newReports: count(mr.data.waitingForYou),
       replyNeeded: mr.data.reports.filter(x => x && x.status === 'waiting').length,
+      reviewed: (Array.isArray(mr.data.reviewed) ? mr.data.reviewed : []).filter(Number.isInteger).slice(0, 20),   // Maintenance 1.3; absent before
       known: (Array.isArray(mr.data.known) ? mr.data.known : []).filter(k => k && (k.status !== 'fixed' || sentAgo(k.updated) === 'today'))
         .slice(0, 6).map(k => ({ title: String(k.title || ''), text: String(k.text || ''), status: k.status })),
     } : null;
