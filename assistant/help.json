@@ -2548,7 +2548,7 @@
         "repair",
         "not working"
       ],
-      "answer": "Maintenance is where you report office problems, IT and equipment faults, and problems with the Hub. Tap Report an issue, choose what it’s about, give it a title, say what’s wrong and how much it’s affecting you, and add up to 3 photos if they help. It goes in under your Hub name. My reports shows each one’s progress; Known issues lists shared problems already being handled.",
+      "answer": "Maintenance is where you report office problems, IT and equipment faults, and problems with the Hub. Tap Report an issue, choose what it’s about, say what’s wrong, pick the room (or tap the spot on the building map) and how much it’s affecting you. It goes in under your Hub name. My reports shows each one’s progress; Known issues lists shared problems already being handled.",
       "link": {
         "tile": "maintenance",
         "label": "Open Maintenance"
@@ -2617,7 +2617,7 @@
         "category",
         "maintenance"
       ],
-      "answer": "Only you and the people handling your report can see it. Each category is handled by the people a Super Admin names under Who handles what, and by Super Admins. Handlers use the To handle tab to update a report, ask for more information or mark it resolved, and write the Known issues, which everyone sees, so they never name anyone. A Super Admin can switch Maintenance on or off for someone in Hub settings.",
+      "answer": "Only you and the people handling your report can see it. Reports are handled by FLR Super Admins. Handlers use the To handle tab to update a report, ask for more information or mark it resolved, and write the Known issues, which everyone sees, so they never name anyone. A Super Admin can switch Maintenance on or off for someone in Hub settings.",
       "link": {
         "tile": "maintenance",
         "label": "Open Maintenance"
