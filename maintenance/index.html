@@ -10,11 +10,11 @@
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://*.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none'">
 <link rel="icon" href="../assets/flr-icon-192.png">
-<link rel="stylesheet" href="maintenance.css?v=1.0">
+<link rel="stylesheet" href="maintenance.css?v=1.1">
 <link rel="stylesheet" href="../tool-transition.css">
 <script src="../flr-config.js"></script>
 <script src="../vendor/supabase-2.116.0.js" defer></script>
-<script src="maintenance.js?v=1.0" defer></script>
+<script src="maintenance.js?v=1.1" defer></script>
 <script type="module" src="../assistant/assistant.js?v=2.4"></script>
 </head>
 <body data-view="loading">
@@ -162,9 +162,14 @@
       </div>
 
       <div class="field" id="field-where">
-        <label class="label" for="f-where"><span id="where-label">Location</span> <span class="opt">optional</span></label>
-        <input class="input" id="f-where" name="where" type="text" maxlength="80" autocomplete="off" list="places" placeholder="For example: First floor, by the kitchen">
-        <datalist id="places"><option value="Ground floor, reception"><option value="Ground floor, kitchen"><option value="First floor, open-plan office"><option value="First floor, meeting room"><option value="Warehouse"><option value="Car park"></datalist>
+        <label class="label" for="f-where"><span id="where-label">Where is it?</span> <span class="opt">optional</span></label>
+        <!-- A room in the FLR building, picked from the groups below or searched; or anywhere else, typed (maintenance.js ROOMS) -->
+        <div class="room-pick" id="room-pick">
+          <input class="input" id="f-where" name="where" type="text" maxlength="80" autocomplete="off" spellcheck="false" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="rooms" aria-describedby="hint-where" placeholder="Search rooms, for example The Forum">
+          <button class="room-clear" id="room-clear" type="button" aria-label="Clear where it is" hidden><svg aria-hidden="true"><use href="#i-close"/></svg></button>
+        </div>
+        <div class="rooms" id="rooms" role="listbox" aria-label="Rooms in the FLR building" hidden></div>
+        <p class="hint" id="hint-where">Pick a room, or type anywhere else.</p>
       </div>
 
       <fieldset class="field" aria-describedby="err-impact">

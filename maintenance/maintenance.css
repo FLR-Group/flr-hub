@@ -408,3 +408,19 @@ select.input{appearance:none;-webkit-appearance:none;background-image:none;curso
 .zoom{position:absolute;inset:0;z-index:5;display:grid;place-items:center;padding:20px;background:rgba(0,0,0,.86);cursor:zoom-out}
 .zoom img{max-width:100%;max-height:100%;border-radius:8px;object-fit:contain}
 .zoom:focus{outline:none}
+
+/* ======================================================================== 1.1: where it is, a room picker */
+.room-pick{position:relative}
+.room-pick .input{padding-right:44px}
+.room-clear{position:absolute;top:50%;right:8px;display:grid;place-items:center;width:30px;height:30px;margin-top:-15px;border:0;border-radius:50%;background:var(--fill);color:var(--ink-2);cursor:pointer}
+.room-clear svg{width:12px;height:12px}
+.rooms{margin:8px 0 0;padding:6px 14px 14px;max-height:min(52vh,440px);overflow-y:auto;overscroll-behavior:contain;border-radius:var(--r-field);background:var(--surface);box-shadow:inset 0 0 0 1px var(--line)}
+.room-head{margin:12px 2px 8px;color:var(--ink-3);font:700 12px/1.2 var(--font-text);letter-spacing:.04em;text-transform:uppercase}
+.room-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px}
+.room{display:flex;align-items:center;min-height:40px;padding:8px 12px;border-radius:10px;background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--line);font:500 14.5px/1.25 var(--font-text);color:var(--ink);cursor:pointer}
+@media (hover:hover){.room:hover{background:var(--tint-soft)}}
+.room.active{box-shadow:inset 0 0 0 2px var(--tint)}
+.room[aria-selected="true"]{background:var(--tint-soft);color:var(--tint);box-shadow:inset 0 0 0 1.5px var(--tint)}
+.room-typed{margin-top:12px;gap:4px;background:transparent;color:var(--ink-2)}
+.room-typed b{color:var(--ink);font-weight:600}
+@media (max-width:420px){.room-grid{grid-template-columns:1fr 1fr}}

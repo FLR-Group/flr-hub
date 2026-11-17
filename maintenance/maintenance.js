@@ -28,11 +28,22 @@
   const REFRESH_MS = 60000;
 
   const CATS = {
-    office: { name: 'Office & Facilities', icon: 'c-office', where: 'Location', placeholder: 'For example: First floor, by the kitchen' },
-    it: { name: 'IT & Equipment', icon: 'c-it', where: 'Location', placeholder: 'For example: First floor, desk 12' },
+    office: { name: 'Office & Facilities', icon: 'c-office', where: 'Where is it?', rooms: true },
+    it: { name: 'IT & Equipment', icon: 'c-it', where: 'Where is it?', rooms: true },
     hub: { name: 'Hub Support', icon: 'c-hub', where: 'Which page or tool?', placeholder: 'For example: Fleet Management' },
-    other: { name: 'Something Else', icon: 'c-other', where: 'Location', placeholder: 'Where is it, if it matters?' },
+    other: { name: 'Something Else', icon: 'c-other', where: 'Where is it?', rooms: true },
   };
+  // The rooms of the FLR building (the user's list, 17 Nov 2026), in groups so the list stays short to scan. A report
+  // keeps the room's name as its location; anything else can still be typed.
+  const ROOMS = [
+    ['Reception & outside', ['Reception', 'Landing', 'Back Door', 'Car Park']],
+    ['Meeting rooms', ['The Bridge', 'The Core', 'The Exchange', 'The Forum', 'The Innovatory', 'The Point', 'The Stadium']],
+    ['Offices', ['Back Office', 'Will’s Office', 'The Archive']],
+    ['Break-out', ['Golf Sim', 'Pool Table']],
+    ['Kitchen & toilets', ['Back Kitchen', 'Back Kitchen Toilet', 'Downstairs Toilet (Men’s)', 'Downstairs Toilet (Women’s)']],
+    ['Warehouse', ['Warehouse', 'Warehouse 25a']],
+  ];
+  const ROOM_PLACEHOLDER = 'Search rooms, for example The Forum';
   const STATUS = {
     submitted: { name: 'Submitted', cls: 'st-submitted' },
     progress: { name: 'In progress', cls: 'st-progress' },
@@ -322,7 +333,7 @@
     if (location.hash) history.replaceState(null, '', location.pathname + location.search);
     if (opener && document.contains(opener)) opener.focus();
   });
-  panel.addEventListener('cancel', e => { e.preventDefault(); if (!zoomClose()) closePanel(); });   // Escape: the photo first, then the panel
+  panel.addEventListener('cancel', e => { e.preventDefault(); if (!zoomClose() && !closeRooms()) closePanel(); });   // Escape: the photo, then the room list, then the panel
   panel.addEventListener('click', e => { if (e.target === panel) closePanel(); });   // the dimmed page behind it
   $('#panel-close').addEventListener('click', closePanel);
 
@@ -405,12 +416,85 @@
   form.addEventListener('change', e => {
     if (e.target.name === 'category') {
       const c = CATS[e.target.value];
-      $('#where-label').textContent = c.where; $('#f-where').placeholder = c.placeholder;
+      $('#where-label').textContent = c.where;
+      roomsOn(!!c.rooms, c.placeholder);
       clearError('category');
     }
     if (e.target.name === 'impact') clearError('impact');
   });
   for (const id of ['title', 'what']) $('#f-' + id).addEventListener('input', () => clearError(id));
+
+  /* ---------------------------------------------------------------- where it is: a room picker
+     The groups open under the box when it's tapped; typing narrows them (a room or its group's name); Enter or a tap picks
+     one; anything that isn't a room is kept as typed. Hub Support asks for a page instead, as plain text. */
+  const where = $('#f-where'), roomsEl = $('#rooms'), clearBtn = $('#room-clear');
+  let useRooms = true, activeRoom = -1;
+  const fold = t => t.toLowerCase().replace(/[’']/g, '').replace(/\s+/g, ' ').trim();
+  function roomsOn(on, placeholder) {
+    useRooms = on;
+    where.placeholder = on ? ROOM_PLACEHOLDER : placeholder || '';
+    where.setAttribute('role', on ? 'combobox' : 'textbox');
+    $('#hint-where').hidden = !on;
+    if (!on) closeRooms();
+  }
+  function roomOptions() { return [...roomsEl.querySelectorAll('[role="option"]')]; }
+  function drawRooms() {
+    const q = fold(where.value);
+    const exact = ROOMS.some(([, rs]) => rs.some(r => fold(r) === q));
+    const groups = ROOMS.map(([g, rs]) => [g, q && !exact && !fold(g).includes(q) ? rs.filter(r => fold(r).includes(q)) : rs]).filter(([, rs]) => rs.length);
+    const out = [];
+    let n = 0;
+    for (const [g, rs] of groups) {
+      const sec = el('div', 'room-group'); sec.setAttribute('role', 'group');
+      const h = el('p', 'room-head', g); h.id = 'room-g' + n; sec.setAttribute('aria-labelledby', h.id);
+      const grid = el('div', 'room-grid');
+      for (const r of rs) {
+        const o = el('div', 'room', r); o.id = 'room-' + n++; o.setAttribute('role', 'option'); o.dataset.room = r;
+        o.setAttribute('aria-selected', String(fold(r) === q));
+        grid.append(o);
+      }
+      sec.append(h, grid); out.push(sec);
+    }
+    if (q && !groups.length) {   // not one of the rooms: kept as typed
+      const o = el('div', 'room room-typed'); o.id = 'room-' + n++; o.setAttribute('role', 'option'); o.dataset.room = where.value.trim();
+      o.append(el('span', '', 'Not a room on the list. Use '), el('b', '', `“${where.value.trim()}”`));
+      out.push(o);
+    }
+    roomsEl.replaceChildren(...out);
+    activeRoom = -1; where.removeAttribute('aria-activedescendant');
+  }
+  function openRooms() {
+    if (!useRooms) return;
+    drawRooms(); roomsEl.hidden = false; where.setAttribute('aria-expanded', 'true');
+  }
+  function closeRooms() {
+    if (roomsEl.hidden) return false;
+    roomsEl.hidden = true; where.setAttribute('aria-expanded', 'false'); where.removeAttribute('aria-activedescendant'); activeRoom = -1;
+    return true;
+  }
+  function pickRoom(name) {
+    where.value = name; clearBtn.hidden = !name; closeRooms();
+  }
+  function moveRoom(d) {
+    const os = roomOptions(); if (!os.length) return;
+    if (activeRoom >= 0) os[activeRoom].classList.remove('active');
+    activeRoom = (activeRoom + d + os.length) % os.length;
+    os[activeRoom].classList.add('active'); os[activeRoom].scrollIntoView({ block: 'nearest' });
+    where.setAttribute('aria-activedescendant', os[activeRoom].id);
+  }
+  where.addEventListener('focus', openRooms);
+  where.addEventListener('click', openRooms);
+  where.addEventListener('input', () => { clearBtn.hidden = !where.value; if (useRooms) { openRooms(); } });
+  where.addEventListener('keydown', e => {
+    if (!useRooms) return;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); if (roomsEl.hidden) openRooms(); moveRoom(e.key === 'ArrowDown' ? 1 : -1); }
+    else if (e.key === 'Enter' && !roomsEl.hidden) { e.preventDefault(); const o = roomOptions()[activeRoom]; if (o) pickRoom(o.dataset.room); else closeRooms(); }
+    else if (e.key === 'Tab') closeRooms();
+  });
+  roomsEl.addEventListener('mousedown', e => e.preventDefault());   // keep the focus in the box while a room is tapped
+  roomsEl.addEventListener('click', e => { const o = e.target.closest('[role="option"]'); if (o) { pickRoom(o.dataset.room); where.focus(); closeRooms(); } });
+  clearBtn.addEventListener('click', () => { where.value = ''; clearBtn.hidden = true; where.focus(); openRooms(); });
+  document.addEventListener('pointerdown', e => { if (!e.target.closest('#field-where')) closeRooms(); });
   const formPhotos = photoPicker($('#thumbs'), $('#f-photo'), $('#err-photo'), n => { form.querySelector('.photo-add').hidden = n >= MAX_PHOTOS; });
 
   function openForm() {
@@ -472,7 +556,7 @@
     try {
       const r = await call('maintenance_report', { p_category: v.cat, p_title: v.title, p_what: v.what, p_location: v.where, p_impact: v.impact, p_photos: formPhotos.photos });
       home.reports.unshift(r); newId = r.id; filter = 'all';
-      form.reset(); formPhotos.clear(); $('#where-label').textContent = 'Location'; $('#f-where').placeholder = CATS.office.placeholder;
+      form.reset(); formPhotos.clear(); $('#where-label').textContent = 'Where is it?'; roomsOn(true); clearBtn.hidden = true;
       setTab('mine'); render();
       $('#done-text').textContent = `“${r.title}” is in My reports as ${r.ref}, marked Submitted.`;
       $('#done-view').dataset.id = r.id;
