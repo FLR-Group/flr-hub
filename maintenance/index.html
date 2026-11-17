@@ -10,12 +10,12 @@
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://*.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none'">
 <link rel="icon" href="../assets/flr-icon-192.png">
-<link rel="stylesheet" href="maintenance.css?v=1.3">
+<link rel="stylesheet" href="maintenance.css?v=1.4">
 <link rel="stylesheet" href="../tool-transition.css">
 <script src="../flr-config.js"></script>
 <script src="../vendor/supabase-2.116.0.js" defer></script>
 <script src="building.js?v=1.0" defer></script>
-<script src="maintenance.js?v=1.3" defer></script>
+<script src="maintenance.js?v=1.4" defer></script>
 <script type="module" src="../assistant/assistant.js?v=2.4"></script>
 </head>
 <body data-view="loading">
@@ -175,7 +175,7 @@
         <button class="link more-where" id="more-where" type="button" aria-expanded="false" aria-controls="where-detail-row">Need to be more specific?</button>
         <button class="link map-open" id="map-open" type="button" aria-expanded="false" aria-controls="map-pick"><svg aria-hidden="true"><use href="#i-map"/></svg><span>Show it on the map</span></button>
         <div class="map-pick" id="map-pick" hidden>
-          <div class="map-tabs" role="tablist" aria-label="Floor" id="map-tabs"></div>
+          <div class="map-bar" id="map-bar"><div class="map-tabs" role="tablist" aria-label="Floor" id="map-tabs"></div></div>
           <div class="map-box" id="map-box"><svg class="bmap" id="map-svg" role="img" aria-label="Plan of the FLR building. Tap where the problem is."></svg></div>
           <p class="hint map-hint" id="map-hint">Tap the spot. A room you tap fills in Where is it?</p>
           <button class="link" id="map-clear" type="button" hidden>Remove the pin</button>

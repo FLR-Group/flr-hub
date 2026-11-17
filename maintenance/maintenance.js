@@ -538,27 +538,98 @@
       g.push(sv('rect', { class: 'bm-stairs', x, y, width: w, height: h }), sv('path', { class: 'bm-steps', d: d.join('') }));
     }
     for (const k of map.racks || []) g.push(sv('rect', { class: 'bm-rack', x: k[0], y: k[1], width: k[2], height: k[3] }));
+    // Names stay about 13px on screen whatever the zoom (but never bigger than at the whole-floor view's own scale).
+    const fs = Math.min(46, 13.5 * unitsPerPx(svgEl));
     for (const r of map.rooms) {
       if (r.small || r.nolabel) continue;
       const [cx, cy] = r.label || centre(r), small = r.rect && Math.min(r.rect[2], r.rect[3]) < 130;
-      const t = sv('text', { class: 'bm-label' + (small ? ' sm' : ''), x: cx, y: cy, 'text-anchor': 'middle', 'dominant-baseline': 'middle' });
+      const t = sv('text', { class: 'bm-label', x: cx, y: cy, 'text-anchor': 'middle', 'dominant-baseline': 'middle', 'font-size': Math.round(fs * (small ? 0.8 : 1)) });
       const words = (r.short || r.name).split(' ');
       const narrow = r.rect && r.rect[2] < 300;
       const lines = narrow && words.length > 1 ? [words.slice(0, Math.ceil(words.length / 2)).join(' '), words.slice(Math.ceil(words.length / 2)).join(' ')] : [words.join(' ')];
       lines.forEach((line, i) => t.append(sv('tspan', { x: cx, dy: i ? '1.15em' : `${-(lines.length - 1) * 0.575}em` }, line)));
       g.push(t);
     }
-    for (const d of map.doors || []) g.push(sv('text', { class: 'bm-door', x: d.side === 'left' ? d.at[0] - 12 : d.at[0] + 12, y: d.at[1], 'text-anchor': d.side === 'left' ? 'end' : 'start', 'dominant-baseline': 'middle' }, d.label));
-    if (o.pin && o.pin.map === map.id) {
-      const px = o.pin.x * map.w, py = o.pin.y * map.h;
-      g.push(sv('circle', { class: 'bm-pin-ring', cx: px, cy: py, r: 46 }), sv('circle', { class: 'bm-pin', cx: px, cy: py, r: 20 }));
-    }
+    for (const d of map.doors || []) g.push(sv('text', { class: 'bm-door', 'font-size': Math.round(fs * 0.75), x: d.side === 'left' ? d.at[0] - 12 : d.at[0] + 12, y: d.at[1], 'text-anchor': d.side === 'left' ? 'end' : 'start', 'dominant-baseline': 'middle' }, d.label));
     svgEl.replaceChildren(...g);
+    if (o.pin && o.pin.map === map.id) svgEl.append(pinEl(svgEl, o.pin.x * map.w, o.pin.y * map.h, o.interactive));
   }
-  const mapSvg = $('#map-svg'), mapPick = $('#map-pick'), mapOpen = $('#map-open');
+  // A map pin whose point is the spot itself, drawn the same size on screen however far the map is zoomed.
+  const unitsPerPx = svgEl => { const vb = svgEl.viewBox.baseVal, w = svgEl.getBoundingClientRect().width; return vb && w ? vb.width / w : 3.5; };
+  function pinEl(svgEl, x, y, interactive) {
+    const k = unitsPerPx(svgEl);
+    const gp = sv('g', { class: 'bm-pin-g' + (interactive ? ' drag' : ''), transform: `translate(${x} ${y}) scale(${k})` });
+    gp.append(sv('ellipse', { class: 'bm-pin-shadow', cx: 0, cy: 0, rx: 6, ry: 2.4 }),
+      sv('path', { class: 'bm-pin', d: 'M0 0C-2.6-7.5-12-14-12-26a12 12 0 1 1 24 0C12-14 2.6-7.5 0 0Z' }),
+      sv('circle', { class: 'bm-pin-eye', cx: 0, cy: -26, r: 4.4 }));
+    if (interactive) gp.append(sv('circle', { class: 'bm-pin-grab', cx: 0, cy: -20, r: 22 }));   // a bigger handle to grab
+    return gp;
+  }
+  // The room under a point of a map (the last-drawn shape wins, as on screen).
+  function roomAt(map, x, y) {
+    for (let i = map.rooms.length - 1; i >= 0; i--) {
+      const r = map.rooms[i];
+      if (r.rect) { if (x >= r.rect[0] && x <= r.rect[0] + r.rect[2] && y >= r.rect[1] && y <= r.rect[1] + r.rect[3]) return r.name; continue; }
+      let inside = false;
+      for (let a = 0, b = r.poly.length - 1; a < r.poly.length; b = a++) {
+        const [xa, ya] = r.poly[a], [xb, yb] = r.poly[b];
+        if ((ya > y) !== (yb > y) && x < ((xb - xa) * (y - ya)) / (yb - ya) + xa) inside = !inside;
+      }
+      if (inside) return r.name;
+    }
+    return '';
+  }
+  // Zoom for a map in its scrolling box: the box keeps its size and the map grows inside it (scroll or swipe to look
+  // round). focus: a map point to keep in the middle.
+  const ZOOMS = [1, 2, 3.5];
+  function zoomer(box, svgEl, redraw) {
+    let z = 1;
+    const api = {
+      get z() { return z; },
+      set(nz, focus) {
+        z = Math.max(1, Math.min(ZOOMS[ZOOMS.length - 1], nz));
+        if (z === 1) { svgEl.style.width = ''; box.style.height = ''; box.classList.remove('zoomed'); }
+        else {
+          if (!box.classList.contains('zoomed')) box.style.height = `${Math.round(box.getBoundingClientRect().height)}px`;
+          box.classList.add('zoomed'); svgEl.style.width = `${z * 100}%`;
+        }
+        redraw();
+        if (focus) {
+          const ctm = svgEl.getScreenCTM(); if (!ctm) return;
+          const pt = new DOMPoint(focus[0], focus[1]).matrixTransform(ctm), r = box.getBoundingClientRect();
+          box.scrollLeft += pt.x - (r.left + r.width / 2); box.scrollTop += pt.y - (r.top + r.height / 2);
+        }
+        if (api.onchange) api.onchange(z);
+      },
+      step(d, focus) { const i = ZOOMS.indexOf(z); api.set(ZOOMS[Math.max(0, Math.min(ZOOMS.length - 1, i + d))], focus); },
+    };
+    return api;
+  }
+  function zoomButtons(zm, focus) {
+    const wrap = el('div', 'map-zoom');
+    const out = el('button', 'zoom-btn', '−'), inn = el('button', 'zoom-btn', '+');
+    out.type = inn.type = 'button'; out.setAttribute('aria-label', 'Zoom out'); inn.setAttribute('aria-label', 'Zoom in');
+    out.addEventListener('click', () => zm.step(-1, focus())); inn.addEventListener('click', () => zm.step(1, focus()));
+    const sync = z => { out.disabled = z === 1; inn.disabled = z === ZOOMS[ZOOMS.length - 1]; };
+    zm.onchange = sync; sync(zm.z);
+    wrap.append(out, inn);
+    return wrap;
+  }
+  const mapSvg = $('#map-svg'), mapPick = $('#map-pick'), mapOpen = $('#map-open'), mapBox = $('#map-box');
   let mapId = (B.maps[0] || {}).id, mapPin = null;
   const curMap = () => B.maps.find(m => m.id === mapId) || B.maps[0];
   let drawn = '';
+  const mapZoom = zoomer(mapBox, mapSvg, () => { drawn = ''; drawPicker(); });
+  // Zoom round the pin when there is one on this floor, else round the middle of what's on screen.
+  const pickerFocus = () => {
+    const m = curMap();
+    if (mapPin && mapPin.map === m.id) return [mapPin.x * m.w, mapPin.y * m.h];
+    const ctm = mapSvg.getScreenCTM(), r = mapBox.getBoundingClientRect();
+    if (!ctm) return null;
+    const p = new DOMPoint(r.left + r.width / 2, r.top + r.height / 2).matrixTransform(ctm.inverse());
+    return [p.x, p.y];
+  };
+  $('#map-bar').append(zoomButtons(mapZoom, pickerFocus));
   function drawPicker() {
     // Only when something changed: redrawing mid-tap (leaving the box fires 'change') would swallow the tap.
     const key = [mapId, roomName(where.value), mapPin && [mapPin.map, mapPin.x, mapPin.y].join()].join('|');
@@ -567,31 +638,53 @@
     $('#map-tabs').replaceChildren(...B.maps.map(m => {
       const b = el('button', 'map-tab', m.name); b.type = 'button'; b.setAttribute('role', 'tab'); b.setAttribute('aria-selected', String(m.id === mapId));
       if (mapPin && mapPin.map === m.id) b.append(el('span', 'map-tab-dot'));
-      b.addEventListener('click', () => { mapId = m.id; drawPicker(); });
+      b.addEventListener('click', () => { if (mapId === m.id) return; mapId = m.id; mapZoom.set(1); });
       return b;
     }));
     drawMap(mapSvg, curMap(), { interactive: true, pin: mapPin, room: roomName(where.value) });
     $('#map-clear').hidden = !mapPin;
+    $('#map-hint').textContent = mapPin ? 'Drag the pin, or tap again, to put its point exactly on the spot.' : 'Tap the spot. A room you tap fills in Where is it?';
   }
-  function mapShowRoom(name) { const m = mapOfRoom(name); if (m) mapId = m.id; drawPicker(); }
+  function mapShowRoom(name) { const m = mapOfRoom(name); if (m && m.id !== mapId) { mapId = m.id; mapZoom.set(1); } else drawPicker(); }
   function showMap(on) {
     drawn = '';
     mapPick.hidden = !on; mapOpen.setAttribute('aria-expanded', String(on));
     mapOpen.querySelector('span').textContent = on ? 'Hide the map' : 'Show it on the map';
-    if (on) { const m = mapOfRoom(roomName(where.value)); if (m) mapId = m.id; drawPicker(); }
+    if (on) { const m = mapOfRoom(roomName(where.value)); if (m) mapId = m.id; mapZoom.set(1); }
   }
   mapOpen.addEventListener('click', () => { closeRooms(); showMap(mapPick.hidden); });
+  const svgPoint = (e) => { const ctm = mapSvg.getScreenCTM(); return ctm && new DOMPoint(e.clientX, e.clientY).matrixTransform(ctm.inverse()); };
+  // Put the pin's point here, and take the room under it.
+  function placePin(x, y) {
+    const m = curMap();
+    if (x < 0 || y < 0 || x > m.w || y > m.h) return false;
+    mapPin = { map: m.id, x: Math.round((x / m.w) * 10000) / 10000, y: Math.round((y / m.h) * 10000) / 10000 };
+    const room = roomAt(m, x, y);
+    if (room) { where.value = room; clearBtn.hidden = false; }
+    return true;
+  }
+  let dragged = false;
   mapSvg.addEventListener('click', e => {
-    const m = curMap(), ctm = mapSvg.getScreenCTM(); if (!ctm) return;
-    const p = new DOMPoint(e.clientX, e.clientY).matrixTransform(ctm.inverse());
-    if (p.x < 0 || p.y < 0 || p.x > m.w || p.y > m.h) return;
-    mapPin = { map: m.id, x: Math.round((p.x / m.w) * 1000) / 1000, y: Math.round((p.y / m.h) * 1000) / 1000 };
-    const room = e.target.closest && e.target.closest('[data-name]');
-    if (room) { where.value = room.dataset.name; clearBtn.hidden = false; }
-    drawPicker();
+    if (dragged) { dragged = false; return; }
+    const p = svgPoint(e); if (!p || !placePin(p.x, p.y)) return;
+    if (mapZoom.z === 1) mapZoom.set(2, [p.x, p.y]);   // the first tap: closer, so the point can go exactly where it should
+    else drawPicker();
   });
-  $('#map-clear').addEventListener('click', () => { mapPin = null; drawPicker(); });
-  function resetMap() { mapPin = null; mapId = (B.maps[0] || {}).id; showMap(false); }
+  // Drag the pin: it follows the finger (its point under where the pin is held), and drops on release.
+  mapSvg.addEventListener('pointerdown', e => {
+    const gp = e.target.closest && e.target.closest('.bm-pin-g'); if (!gp || !mapPin) return;
+    e.preventDefault(); mapSvg.setPointerCapture(e.pointerId);
+    const m = curMap(), start = svgPoint(e), ox = mapPin.x * m.w - start.x, oy = mapPin.y * m.h - start.y, k = unitsPerPx(mapSvg);
+    let last = null;
+    const move = ev => { const p = svgPoint(ev); if (!p) return; last = [p.x + ox, p.y + oy]; gp.setAttribute('transform', `translate(${last[0]} ${last[1]}) scale(${k})`); };
+    const up = () => {
+      mapSvg.removeEventListener('pointermove', move); mapSvg.removeEventListener('pointerup', up); mapSvg.removeEventListener('pointercancel', up);
+      if (last) { dragged = true; setTimeout(() => { dragged = false; }, 0); placePin(last[0], last[1]); drawPicker(); }
+    };
+    mapSvg.addEventListener('pointermove', move); mapSvg.addEventListener('pointerup', up); mapSvg.addEventListener('pointercancel', up);
+  });
+  $('#map-clear').addEventListener('click', () => { mapPin = null; mapZoom.set(1); });
+  function resetMap() { mapPin = null; mapId = (B.maps[0] || {}).id; showMap(false); mapZoom.set(1); }
   // Each new room typed or picked outlines it on the open map.
   where.addEventListener('change', () => { if (!mapPick.hidden) mapShowRoom(roomName(where.value)); });
 
@@ -714,10 +807,13 @@
     const pinMap = r.pin && B.maps.find(m => m.id === r.pin.map);
     if (pinMap) {   // where it is, on the map, before the photos
       const box = el('div', 'map-box map-mini'); const s2 = sv('svg', { class: 'bmap', role: 'img', 'aria-label': `${pinMap.name}: the pin marks where it is` });
-      drawMap(s2, pinMap, { pin: r.pin, room: roomName(r.location) }); box.append(s2);
-      d.insertBefore(el('h4', 'd-h', `On the map · ${pinMap.name}`), facts.nextSibling.nextSibling.nextSibling);
-      d.insertBefore(box, facts.nextSibling.nextSibling.nextSibling.nextSibling);
-      requestAnimationFrame(() => { box.scrollLeft = r.pin.x * box.scrollWidth - box.clientWidth / 2; });
+      box.append(s2);
+      const at = [r.pin.x * pinMap.w, r.pin.y * pinMap.h];
+      const zm = zoomer(box, s2, () => drawMap(s2, pinMap, { pin: r.pin, room: roomName(r.location) }));
+      const head = el('div', 'd-maphead'); head.append(el('h4', 'd-h', `On the map · ${pinMap.name}`), zoomButtons(zm, () => at));
+      const wrap = el('div', 'd-map'); wrap.append(head, box);
+      d.insertBefore(wrap, facts.nextSibling.nextSibling.nextSibling);
+      requestAnimationFrame(() => zm.set(2, at));   // close enough to see the exact spot; − shows the whole floor
     }
     if (asHandler) d.append(updateBox(r));
     else if (r.status !== 'resolved') d.append(replyBox(r));
