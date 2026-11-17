@@ -33,15 +33,14 @@
     hub: { name: 'Hub Support', icon: 'c-hub', where: 'Which page or tool?', placeholder: 'For example: Fleet Management' },
     other: { name: 'Something Else', icon: 'c-other', where: 'Where is it?', rooms: true },
   };
-  // The rooms of the FLR building (the user's list, 17 Nov 2026), in groups so the list stays short to scan. A report
-  // keeps the room's name as its location; anything else can still be typed.
+  // The rooms of the FLR building (the user's list, 17 Nov 2026), by floor as the fire plan has them (building.js), so
+  // the list stays short to scan. A report keeps the room's name as its location; anything else can still be typed.
   const ROOMS = [
-    ['Reception & outside', ['Reception', 'Landing', 'Back Door', 'Car Park']],
-    ['Meeting rooms', ['The Bridge', 'The Core', 'The Exchange', 'The Forum', 'The Innovatory', 'The Point', 'The Stadium']],
-    ['Offices', ['Back Office', 'Will’s Office', 'The Archive']],
-    ['Break-out', ['Golf Sim', 'Pool Table']],
-    ['Kitchen & toilets', ['Back Kitchen', 'Back Kitchen Toilet', 'Downstairs Toilet (Men’s)', 'Downstairs Toilet (Women’s)']],
-    ['Warehouse', ['Warehouse', 'Warehouse 25a']],
+    ['Ground floor', ['Reception', 'Showroom', 'The Forum', 'Golf Sim', 'Pool Table', 'Downstairs Toilet (Men’s)', 'Downstairs Toilet (Women’s)']],
+    ['First floor', ['Landing', 'The Bridge', 'The Core', 'The Innovatory', 'The Point', 'The Stadium', 'The Exchange', 'The Archive', 'Will’s Office', 'Back Office', 'Back Kitchen', 'Back Kitchen Toilet', 'Toilet & Shower']],
+    ['Warehouse', ['Warehouse', 'Store', 'Carpet Racking', 'Adhesive Store', 'Back Door']],
+    ['Unit 25A', ['Warehouse 25a', 'Showroom 25a', 'Kitchen 25a', 'Toilet 25a', 'Storage 25a']],
+    ['Outside', ['Car Park']],
   ];
   const ROOM_PLACEHOLDER = 'Search rooms, for example The Forum';
   const STATUS = {
@@ -475,6 +474,9 @@
   }
   function pickRoom(name) {
     where.value = name; clearBtn.hidden = !name; closeRooms();
+    const m = mapOfRoom(name);
+    if (mapPin && m && mapPin.map !== m.id) mapPin = null;   // a pin on another floor no longer goes with it
+    if (!$('#map-pick').hidden) mapShowRoom(name);
   }
   function moveRoom(d) {
     const os = roomOptions(); if (!os.length) return;
@@ -483,7 +485,7 @@
     os[activeRoom].classList.add('active'); os[activeRoom].scrollIntoView({ block: 'nearest' });
     where.setAttribute('aria-activedescendant', os[activeRoom].id);
   }
-  where.addEventListener('focus', openRooms);
+  // Not on focus: coming back to the window focuses the box again, and the list would open over whatever was tapped.
   where.addEventListener('click', openRooms);
   where.addEventListener('input', () => { clearBtn.hidden = !where.value; if (useRooms) { openRooms(); } });
   where.addEventListener('keydown', e => {
@@ -502,6 +504,97 @@
     if (!on) detail.value = '';
   }
   moreBtn.addEventListener('click', () => { closeRooms(); showDetail(true); detail.focus(); });
+  /* ---------------------------------------------------------------- the building map (building.js)
+     Show it on the map: a tab per floor; a tap drops a pin there (kept as fractions of the map) and, on a room, fills in
+     Where is it? A room picked from the list opens its floor and is outlined. */
+  const B = window.FLR_BUILDING || { maps: [] };
+  const NS = 'http://www.w3.org/2000/svg';
+  const sv = (tag, attrs = {}, text) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; return e; };
+  const shapeOf = r => r.rect ? sv('rect', { x: r.rect[0], y: r.rect[1], width: r.rect[2], height: r.rect[3] }) : sv('polygon', { points: r.poly.map(p => p.join(',')).join(' ') });
+  const centre = r => { if (r.rect) return [r.rect[0] + r.rect[2] / 2, r.rect[1] + r.rect[3] / 2]; const xs = r.poly.map(p => p[0]), ys = r.poly.map(p => p[1]); return [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2]; };
+  const mapOfRoom = name => B.maps.find(m => m.rooms.some(r => r.name === name));
+  const roomName = loc => String(loc || '').split(' · ')[0];
+  // One map drawn into an <svg>: walls, rooms with their names, voids, stairs, racking, and a pin.
+  function drawMap(svgEl, map, o = {}) {
+    // Framed round the building (the plan's empty strip above it left out), with room for the entrance label.
+    const xs = map.outline.map(p => p[0]), ys = map.outline.map(p => p[1]), pad = 24;
+    const x0 = Math.max(0, Math.min(...xs) - (map.doors && map.doors.some(d => d.side === 'left') ? 150 : pad)), y0 = Math.max(0, Math.min(...ys) - pad);
+    svgEl.setAttribute('viewBox', `${x0} ${y0} ${Math.min(map.w, Math.max(...xs) + pad) - x0} ${Math.min(map.h, Math.max(...ys) + pad) - y0}`);
+    const g = [];
+    g.push(sv('polygon', { class: 'bm-outline', points: map.outline.map(p => p.join(',')).join(' ') }));
+    for (const r of map.rooms) {
+      const sh = shapeOf(r); sh.setAttribute('class', 'bm-room' + (o.room === r.name ? ' on' : '')); sh.dataset.name = r.name;
+      if (o.interactive) sh.append(sv('title', {}, r.name));
+      g.push(sh);
+    }
+    for (const b of map.blank || []) g.push(sv('rect', { class: 'bm-blank', x: b[0], y: b[1], width: b[2], height: b[3] }));
+    for (const v of map.voids || []) {
+      g.push(sv('rect', { class: 'bm-void', x: v[0], y: v[1], width: v[2], height: v[3] }));
+      g.push(sv('path', { class: 'bm-cross', d: `M${v[0]} ${v[1]}L${v[0] + v[2]} ${v[1] + v[3]}M${v[0] + v[2]} ${v[1]}L${v[0]} ${v[1] + v[3]}` }));
+    }
+    for (const st of map.stairs || []) {
+      const [x, y, w, h] = st, d = [];
+      for (let i = 1; i < 7; i++) d.push(`M${x + (w * i) / 7} ${y}V${y + h}`);
+      g.push(sv('rect', { class: 'bm-stairs', x, y, width: w, height: h }), sv('path', { class: 'bm-steps', d: d.join('') }));
+    }
+    for (const k of map.racks || []) g.push(sv('rect', { class: 'bm-rack', x: k[0], y: k[1], width: k[2], height: k[3] }));
+    for (const r of map.rooms) {
+      if (r.small || r.nolabel) continue;
+      const [cx, cy] = r.label || centre(r), small = r.rect && Math.min(r.rect[2], r.rect[3]) < 130;
+      const t = sv('text', { class: 'bm-label' + (small ? ' sm' : ''), x: cx, y: cy, 'text-anchor': 'middle', 'dominant-baseline': 'middle' });
+      const words = (r.short || r.name).split(' ');
+      const narrow = r.rect && r.rect[2] < 300;
+      const lines = narrow && words.length > 1 ? [words.slice(0, Math.ceil(words.length / 2)).join(' '), words.slice(Math.ceil(words.length / 2)).join(' ')] : [words.join(' ')];
+      lines.forEach((line, i) => t.append(sv('tspan', { x: cx, dy: i ? '1.15em' : `${-(lines.length - 1) * 0.575}em` }, line)));
+      g.push(t);
+    }
+    for (const d of map.doors || []) g.push(sv('text', { class: 'bm-door', x: d.side === 'left' ? d.at[0] - 12 : d.at[0] + 12, y: d.at[1], 'text-anchor': d.side === 'left' ? 'end' : 'start', 'dominant-baseline': 'middle' }, d.label));
+    if (o.pin && o.pin.map === map.id) {
+      const px = o.pin.x * map.w, py = o.pin.y * map.h;
+      g.push(sv('circle', { class: 'bm-pin-ring', cx: px, cy: py, r: 46 }), sv('circle', { class: 'bm-pin', cx: px, cy: py, r: 20 }));
+    }
+    svgEl.replaceChildren(...g);
+  }
+  const mapSvg = $('#map-svg'), mapPick = $('#map-pick'), mapOpen = $('#map-open');
+  let mapId = (B.maps[0] || {}).id, mapPin = null;
+  const curMap = () => B.maps.find(m => m.id === mapId) || B.maps[0];
+  let drawn = '';
+  function drawPicker() {
+    // Only when something changed: redrawing mid-tap (leaving the box fires 'change') would swallow the tap.
+    const key = [mapId, roomName(where.value), mapPin && [mapPin.map, mapPin.x, mapPin.y].join()].join('|');
+    if (key === drawn) return;
+    drawn = key;
+    $('#map-tabs').replaceChildren(...B.maps.map(m => {
+      const b = el('button', 'map-tab', m.name); b.type = 'button'; b.setAttribute('role', 'tab'); b.setAttribute('aria-selected', String(m.id === mapId));
+      if (mapPin && mapPin.map === m.id) b.append(el('span', 'map-tab-dot'));
+      b.addEventListener('click', () => { mapId = m.id; drawPicker(); });
+      return b;
+    }));
+    drawMap(mapSvg, curMap(), { interactive: true, pin: mapPin, room: roomName(where.value) });
+    $('#map-clear').hidden = !mapPin;
+  }
+  function mapShowRoom(name) { const m = mapOfRoom(name); if (m) mapId = m.id; drawPicker(); }
+  function showMap(on) {
+    drawn = '';
+    mapPick.hidden = !on; mapOpen.setAttribute('aria-expanded', String(on));
+    mapOpen.querySelector('span').textContent = on ? 'Hide the map' : 'Show it on the map';
+    if (on) { const m = mapOfRoom(roomName(where.value)); if (m) mapId = m.id; drawPicker(); }
+  }
+  mapOpen.addEventListener('click', () => { closeRooms(); showMap(mapPick.hidden); });
+  mapSvg.addEventListener('click', e => {
+    const m = curMap(), ctm = mapSvg.getScreenCTM(); if (!ctm) return;
+    const p = new DOMPoint(e.clientX, e.clientY).matrixTransform(ctm.inverse());
+    if (p.x < 0 || p.y < 0 || p.x > m.w || p.y > m.h) return;
+    mapPin = { map: m.id, x: Math.round((p.x / m.w) * 1000) / 1000, y: Math.round((p.y / m.h) * 1000) / 1000 };
+    const room = e.target.closest && e.target.closest('[data-name]');
+    if (room) { where.value = room.dataset.name; clearBtn.hidden = false; }
+    drawPicker();
+  });
+  $('#map-clear').addEventListener('click', () => { mapPin = null; drawPicker(); });
+  function resetMap() { mapPin = null; mapId = (B.maps[0] || {}).id; showMap(false); }
+  // Each new room typed or picked outlines it on the open map.
+  where.addEventListener('change', () => { if (!mapPick.hidden) mapShowRoom(roomName(where.value)); });
+
   const whereText = () => [where.value.trim(), detail.value.trim().replace(/\s+/g, ' ')].filter(Boolean).join(' · ').slice(0, 80);
   document.addEventListener('pointerdown', e => { if (!e.target.closest('#field-where')) closeRooms(); });
   const formPhotos = photoPicker($('#thumbs'), $('#f-photo'), $('#err-photo'), n => { form.querySelector('.photo-add').hidden = n >= MAX_PHOTOS; });
@@ -563,9 +656,13 @@
     }
     busy(btn, true, 'Sending…');
     try {
-      const r = await call('maintenance_report', { p_category: v.cat, p_title: v.title, p_what: v.what, p_location: v.where, p_impact: v.impact, p_photos: formPhotos.photos });
+      const args = { p_category: v.cat, p_title: v.title, p_what: v.what, p_location: v.where, p_impact: v.impact, p_photos: formPhotos.photos };
+      let r;
+      // A database from before pins (Maintenance 1.2) doesn't know p_pin: the report goes in without it.
+      try { r = await call('maintenance_report', mapPin ? { ...args, p_pin: mapPin } : args); }
+      catch (e1) { if (mapPin && missingFunction(e1)) { r = await call('maintenance_report', args); toast('Report sent. The map pin couldn’t be saved yet.'); } else throw e1; }
       home.reports.unshift(r); newId = r.id; filter = 'all';
-      form.reset(); formPhotos.clear(); $('#where-label').textContent = 'Where is it?'; roomsOn(true); clearBtn.hidden = true; showDetail(false);
+      form.reset(); formPhotos.clear(); $('#where-label').textContent = 'Where is it?'; roomsOn(true); clearBtn.hidden = true; showDetail(false); resetMap();
       setTab('mine'); render();
       $('#done-text').textContent = `“${r.title}” is in My reports as ${r.ref}, marked Submitted.`;
       $('#done-view').dataset.id = r.id;
@@ -614,6 +711,14 @@
     }
     d.replaceChildren(top, el('h3', 'd-title', r.title), facts, el('h4', 'd-h', 'What’s wrong'), el('p', 'd-desc', r.what),
       el('h4', 'd-h', 'Photos and screenshots'), files, el('h4', 'd-h', 'Updates'), tl);
+    const pinMap = r.pin && B.maps.find(m => m.id === r.pin.map);
+    if (pinMap) {   // where it is, on the map, before the photos
+      const box = el('div', 'map-box map-mini'); const s2 = sv('svg', { class: 'bmap', role: 'img', 'aria-label': `${pinMap.name}: the pin marks where it is` });
+      drawMap(s2, pinMap, { pin: r.pin, room: roomName(r.location) }); box.append(s2);
+      d.insertBefore(el('h4', 'd-h', `On the map · ${pinMap.name}`), facts.nextSibling.nextSibling.nextSibling);
+      d.insertBefore(box, facts.nextSibling.nextSibling.nextSibling.nextSibling);
+      requestAnimationFrame(() => { box.scrollLeft = r.pin.x * box.scrollWidth - box.clientWidth / 2; });
+    }
     if (asHandler) d.append(updateBox(r));
     else if (r.status !== 'resolved') d.append(replyBox(r));
     openPanel('detail', 'Report details');
