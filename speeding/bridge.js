@@ -192,7 +192,9 @@
   // straight away, then reads the data again every few seconds until the new sync is in. One ask serves everyone, at most
   // every 2 minutes; within that it just reads what FLR already has. Added here so the page itself (built from
   // ../flr-speeding-report) needs no change: the button is put back whenever the page redraws that line.
-  const fleetAt = () => { const m = data && data.docs && data.docs['fleet/meta']; return m ? m.fetchedAt || null : null; };
+  // The time of the last good Monday sync, as the page shows it (status/mondaySync, else the fleet copy's own time).
+  const fleetAt = () => { const d = data && data.docs || {}, st = d['status/mondaySync'], m = d['fleet/meta'];
+    return (st && st.ok && st.lastSuccessAt) || (m && m.fetchedAt) || null; };
   let checking = false;
   async function checkMonday(btn) {
     if (checking) return;
