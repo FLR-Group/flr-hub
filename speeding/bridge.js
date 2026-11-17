@@ -210,8 +210,8 @@
     setTimeout(() => document.querySelectorAll('.flr-readnow').forEach(b => { if (!checking) b.textContent = 'Check Monday now'; }), 5000);
   }
   function addButtons() {
-    for (const line of document.querySelectorAll('.avsec .syncline')) {
-      if (line.querySelector('.flr-readnow')) continue;
+    for (const line of document.querySelectorAll('.syncline')) {
+      if (line.querySelector('.flr-readnow') || !/^Monday fleet board/.test(line.textContent)) continue;
       const b = document.createElement('button');
       b.type = 'button'; b.className = 'flr-readnow'; b.textContent = checking ? 'Checking Monday…' : 'Check Monday now';
       if (checking) b.setAttribute('aria-busy', 'true');
