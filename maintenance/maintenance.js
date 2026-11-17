@@ -435,6 +435,7 @@
     where.placeholder = on ? ROOM_PLACEHOLDER : placeholder || '';
     where.setAttribute('role', on ? 'combobox' : 'textbox');
     $('#hint-where').hidden = !on;
+    $('#more-where').hidden = !on || !$('#where-detail-row').hidden; if (!on) { $('#where-detail-row').hidden = true; $('#f-where-detail').value = ''; }
     if (!on) closeRooms();
   }
   function roomOptions() { return [...roomsEl.querySelectorAll('[role="option"]')]; }
@@ -494,6 +495,14 @@
   roomsEl.addEventListener('mousedown', e => e.preventDefault());   // keep the focus in the box while a room is tapped
   roomsEl.addEventListener('click', e => { const o = e.target.closest('[role="option"]'); if (o) { pickRoom(o.dataset.room); where.focus(); closeRooms(); } });
   clearBtn.addEventListener('click', () => { where.value = ''; clearBtn.hidden = true; where.focus(); openRooms(); });
+  // Need to be more specific? A few words more, saved with the room as "The Forum · the desk by the window".
+  const moreBtn = $('#more-where'), detailRow = $('#where-detail-row'), detail = $('#f-where-detail');
+  function showDetail(on) {
+    detailRow.hidden = !on; moreBtn.hidden = on; moreBtn.setAttribute('aria-expanded', String(on));
+    if (!on) detail.value = '';
+  }
+  moreBtn.addEventListener('click', () => { closeRooms(); showDetail(true); detail.focus(); });
+  const whereText = () => [where.value.trim(), detail.value.trim().replace(/\s+/g, ' ')].filter(Boolean).join(' · ').slice(0, 80);
   document.addEventListener('pointerdown', e => { if (!e.target.closest('#field-where')) closeRooms(); });
   const formPhotos = photoPicker($('#thumbs'), $('#f-photo'), $('#err-photo'), n => { form.querySelector('.photo-add').hidden = n >= MAX_PHOTOS; });
 
@@ -526,7 +535,7 @@
       cat: (form.querySelector('input[name="category"]:checked') || {}).value || '',
       title: $('#f-title').value.trim().replace(/\s+/g, ' '),
       what: $('#f-what').value.trim(),
-      where: $('#f-where').value.trim(),
+      where: whereText(),
       impact: (form.querySelector('input[name="impact"]:checked') || {}).value || '',
     };
     const errs = [];
@@ -556,7 +565,7 @@
     try {
       const r = await call('maintenance_report', { p_category: v.cat, p_title: v.title, p_what: v.what, p_location: v.where, p_impact: v.impact, p_photos: formPhotos.photos });
       home.reports.unshift(r); newId = r.id; filter = 'all';
-      form.reset(); formPhotos.clear(); $('#where-label').textContent = 'Where is it?'; roomsOn(true); clearBtn.hidden = true;
+      form.reset(); formPhotos.clear(); $('#where-label').textContent = 'Where is it?'; roomsOn(true); clearBtn.hidden = true; showDetail(false);
       setTab('mine'); render();
       $('#done-text').textContent = `“${r.title}” is in My reports as ${r.ref}, marked Submitted.`;
       $('#done-view').dataset.id = r.id;

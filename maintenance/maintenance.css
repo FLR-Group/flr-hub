@@ -424,3 +424,6 @@ select.input{appearance:none;-webkit-appearance:none;background-image:none;curso
 .room-typed{margin-top:12px;gap:4px;background:transparent;color:var(--ink-2)}
 .room-typed b{color:var(--ink);font-weight:600}
 @media (max-width:420px){.room-grid{grid-template-columns:1fr 1fr}}
+.more-where{display:inline-block;margin:8px 2px 0;font-size:14.5px}
+.where-detail{margin-top:12px}
+.label-sub{font-size:14px;color:var(--ink-2)}
