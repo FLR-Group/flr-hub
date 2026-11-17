@@ -894,6 +894,7 @@
 
   /* ---------------------------------------------------------------- start */
   function route() {
+    if (location.hash === '#handle') { if (handler()) setTab('handle'); history.replaceState(null, '', location.pathname + location.search); return; }   // from the Hub's Needs your attention
     const m = /^#(report|MNT-(\d+)(\/handle)?)$/.exec(location.hash);
     if (!m) return;
     if (m[1] === 'report') openForm();

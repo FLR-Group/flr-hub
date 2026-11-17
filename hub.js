@@ -485,8 +485,16 @@
       const w = `${plural(count(a.accounts.waiting), 'new account', 'new accounts')} waiting`;
       lines.push({ app: 'settings', href: 'settings/', title: w, short: w, sub: 'Hub settings · Super Admins only', subShort: 'Hub settings' });
     }
+    const mt = a.maintenance, mtUrl = url('maintenance');
+    if (mt && mtUrl) {
+      const n = count(mt.newReports), w = count(mt.replyNeeded);
+      if (n) lines.push({ app: 'maintenance', href: mtUrl + (SAME_SITE.test(mtUrl) ? '#handle' : ''), title: `${plural(n, 'new problem', 'new problems')} reported`,
+        short: `${plural(n, 'new problem', 'new problems')}`, sub: 'Maintenance · waiting to be picked up', subShort: 'Maintenance' });
+      if (w) lines.push({ app: 'maintenance', href: mtUrl, title: `${plural(w, 'report of yours needs', 'reports of yours need')} a reply`,
+        short: `${plural(w, 'report needs', 'reports need')} a reply`, sub: 'Maintenance · someone asked for more information', subShort: 'Maintenance' });
+    }
     // Whether anything could ever be listed for this person: if not, there's no panel at all.
-    const possible = !!((leave && leaveUrl) || (fleet && fleetUrl) || (drafts && estUrl) || a.accounts);
+    const possible = !!((leave && leaveUrl) || (fleet && fleetUrl) || (drafts && estUrl) || a.accounts || (mt && mtUrl));
     return { lines, possible };
   }
   const svgUse = (cls, id) => {
@@ -520,6 +528,7 @@
       ['estimator', a.drafts ? count(a.drafts.empty) : 0, k => plural(k, 'empty draft', 'empty drafts')],
       ['speeding', fleetN, () => [count(a.fleet.action) ? `${count(a.fleet.action)} overdue` : '', count(a.fleet.check) ? `${count(a.fleet.check)} need${count(a.fleet.check) === 1 ? 's' : ''} checking` : ''].filter(Boolean).join(', ')],
       ['annual-leave', a.leave ? count(a.leave.waiting) : 0, k => `${k} waiting for a decision`],
+      ['maintenance', a.maintenance ? count(a.maintenance.newReports) + count(a.maintenance.replyNeeded) : 0, k => plural(k, 'problem needs you', 'problems need you')],
     ];
     for (const [id, k, say] of marks) {
       const li = k ? tilesEl.querySelector(`.tile[data-id="${id}"]`) : null;
@@ -529,10 +538,29 @@
     }
   }
   let attnHome = null, attnAt = 0;
+  // Today: what's going on in the building, for everyone with Maintenance: its known issues (still open, or fixed today).
+  const KNOWN = { known: 'Known', fixing: 'Being fixed', fixed: 'Fixed' };
+  function renderToday(mt, tiles) {
+    const sec = $('#today-sec'), t = (tiles || []).find(x => x && x.id === 'maintenance');
+    if (!mt || !t || !safeTile(t)) { sec.hidden = true; return false; }
+    const items = (Array.isArray(mt.known) ? mt.known : []).filter(k => k && typeof k.title === 'string');
+    const list = $('#today-list');
+    if (items.length) list.replaceChildren(...items.map(k => attentionRow({ app: 'maintenance', href: t.url,
+      title: k.title, short: k.title, sub: `${KNOWN[k.status] || 'Known'}${k.text ? ` · ${k.text}` : ''}`, subShort: KNOWN[k.status] || 'Known' })));
+    else {
+      const li = el('li', 'attn-none');
+      li.append(svgUse('attn-ok', 'i-check'), el('span', 'attn-title', 'No known problems in the building today'));
+      list.replaceChildren(li);
+    }
+    sec.hidden = false;
+    return true;
+  }
+  const sideOn = () => $('#home-grid').classList.toggle('with-attn', !$('#attn').hidden || !$('#today-sec').hidden);
   function renderAttention(a, at, tiles) {
-    const sec = $('#attn'), grid = $('#home-grid');
+    const sec = $('#attn');
+    renderToday(a && a.maintenance, tiles);
     const view = a && typeof a === 'object' ? attentionLines(a, tiles || []) : null;
-    if (!view || !view.possible) { sec.hidden = true; sec.classList.remove('is-loading'); grid.classList.remove('with-attn'); tileBadges(null); return; }
+    if (!view || !view.possible) { sec.hidden = true; sec.classList.remove('is-loading'); sideOn(); tileBadges(null); return; }
     const list = $('#attn-list');
     if (view.lines.length) list.replaceChildren(...view.lines.map(attentionRow));
     else {
@@ -543,7 +571,7 @@
     const t = new Date(at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
     $('#attn-foot').textContent = `Counts only. Each line appears only if you can open that tool. Updated ${t}.`;
     const appearing = sec.hidden || sec.classList.contains('is-loading');
-    sec.classList.remove('is-loading'); sec.hidden = false; grid.classList.add('with-attn');
+    sec.classList.remove('is-loading'); sec.hidden = false; sideOn();
     tileBadges(a);
     if (appearing && !reduced()) list.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 240, easing: 'ease' });
   }
@@ -568,17 +596,28 @@
     try { const c = JSON.parse(tabStore.get(ATTN_KEY) || 'null'); if (c && c.who === who && c.a && typeof c.at === 'number') cached = c; } catch (e) { /* asked again */ }
     if (cached) { attnAt = cached.at; renderAttention(cached.a, cached.at, home.tiles); if (!o.force && Date.now() - cached.at < ATTN_MS) return; }
     else attentionLoading(home);
-    let r;
-    try { r = await client().rpc('hub_attention'); } catch (e) { r = { error: e }; }
+    // Maintenance's own answer, for people with it: new problems for its handlers, their own reports waiting on them,
+    // and the known issues for Today. Asked at the same time; either can fail without the other.
+    const ask = fn => client().rpc(fn).then(x => x, e => ({ error: e }));
+    const hasMaint = home.tiles.some(t => t && t.id === 'maintenance');
+    const [r, mr] = await Promise.all([ask('hub_attention'), hasMaint ? ask('maintenance_home') : null]);
     if (attnHome !== home) return;   // signed out or reloaded meanwhile
-    if (r.error || !r.data || typeof r.data !== 'object' || Array.isArray(r.data)) {
+    const ok = !r.error && r.data && typeof r.data === 'object' && !Array.isArray(r.data);
+    const m = mr && !mr.error && mr.data && Array.isArray(mr.data.reports) ? {
+      newReports: count(mr.data.waitingForYou),
+      replyNeeded: mr.data.reports.filter(x => x && x.status === 'waiting').length,
+      known: (Array.isArray(mr.data.known) ? mr.data.known : []).filter(k => k && (k.status !== 'fixed' || sentAgo(k.updated) === 'today'))
+        .slice(0, 6).map(k => ({ title: String(k.title || ''), text: String(k.text || ''), status: k.status })),
+    } : null;
+    if (!ok && !m) {
       if (r.error && missingFunction(r.error)) store.del(ATTN_SEEN);
       tabStore.del(ATTN_KEY); attnAt = 0; renderAttention(null); return;
     }
-    store.set(ATTN_SEEN, '1');
+    if (ok) store.set(ATTN_SEEN, '1');
+    const a = { ...(ok ? r.data : {}), ...(m ? { maintenance: m } : {}) };
     attnAt = Date.now();
-    tabStore.set(ATTN_KEY, JSON.stringify({ who, at: attnAt, a: r.data }));
-    renderAttention(r.data, attnAt, home.tiles);
+    tabStore.set(ATTN_KEY, JSON.stringify({ who, at: attnAt, a }));
+    renderAttention(a, attnAt, home.tiles);
   }
   const forgetAttention = () => { tabStore.del(ATTN_KEY); attnHome = null; attnAt = 0; renderAttention(null); };
   // Back on the Hub after a while (another tab, or Back from a tool): read the counts again once they're five minutes old.
