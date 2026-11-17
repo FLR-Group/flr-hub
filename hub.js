@@ -548,10 +548,10 @@
     const text = el('span', 'attn-text'), title = el('span', 'attn-title'), sub = el('span', 'attn-sub');
     // Your own birthday is said to you.
     const me = attnHome && String(attnHome.name || '').trim().toLowerCase() === b.name.trim().toLowerCase();
-    const t = b.today ? `Happy birthday, ${me ? b.first : b.name}${me ? '!' : ''}` : `${b.name} had a birthday on ${WEEKDAY(b.on)}`;
-    title.append(el('span', 'long', t), el('span', 'short', b.today ? `Happy birthday, ${b.first}${me ? '!' : ''}` : `${b.first}’s birthday, ${WEEKDAY(b.on)}`));
-    const subLong = me ? 'From everyone at FLR. Have a great day.' : b.today ? 'It’s their birthday today. Wish them a good one!' : 'At the weekend: wish them a happy belated birthday';
-    sub.append(el('span', 'long', subLong), el('span', 'short', me ? 'From everyone at FLR' : b.today ? 'Birthday today' : 'At the weekend'));
+    const t = me ? `Happy birthday, ${b.first}!` : b.today ? `It’s ${b.name}’s birthday today` : `${b.name} had a birthday on ${WEEKDAY(b.on)}`;
+    title.append(el('span', 'long', t), el('span', 'short', me ? `Happy birthday, ${b.first}!` : b.today ? `It’s ${b.first}’s birthday` : `${b.first}’s birthday, ${WEEKDAY(b.on)}`));
+    const subLong = me ? 'From everyone at FLR. Have a great day.' : b.today ? 'Wish them a happy birthday!' : 'At the weekend: wish them a happy belated birthday';
+    sub.append(el('span', 'long', subLong), el('span', 'short', me ? 'From everyone at FLR' : b.today ? 'Wish them a happy birthday!' : 'At the weekend'));
     text.append(title, sub); row.append(icon, text); li.append(row);
     return li;
   }
