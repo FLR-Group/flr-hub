@@ -7,13 +7,14 @@
 
    Handlers (the people chosen for a category, and every Super Admin): the To handle tab lists the reports in their
    categories with who raised them; each report's panel has an update box (In progress, Waiting for information with
-   the question, Resolved, or just a note). They also write the Known issues. Super Admins choose who handles what.
+   the question, Resolved, or just a note). They also write the Known issues. (Who handles what isn't on this page:
+   Super Admins handle everything, and handlers can still be named with maintenance_set_handler from the SQL editor.)
 
    The data (Estimator repo, 20261029100000_flr_maintenance.sql):
      maintenance_home()   { you, handles, superAdmin, waitingForYou, reports, known, now }
      maintenance_queue()  { handles, superAdmin, reports (with by/email), known (to edit), handlers (Super Admins) }
      maintenance_report(), maintenance_reply(), maintenance_photo(id), maintenance_update(),
-     maintenance_known_save(), maintenance_set_handler()
+     maintenance_known_save()
    Nothing goes to Monday and nobody is notified yet: handlers see new reports here.
    Photos are made smaller here first (1600 px JPEG) and sent as data: addresses (this page's CSP allows data: images).
    This page's CSP allows no inline styles: everything is built as elements.
@@ -244,48 +245,10 @@
     }));
     $('#known-manage').hidden = !queue.known.length;
     $('#known-manage-none').hidden = !!queue.known.length;
-    $('#handlers-section').hidden = !queue.superAdmin;
-    if (queue.superAdmin) renderHandlers();
   }
   $('#queue').addEventListener('click', e => { const b = e.target.closest('.report'); if (b) openDetail(Number(b.dataset.id), true); });
   $('#known-manage').addEventListener('click', e => { const b = e.target.closest('.report'); if (b) openKnown(Number(b.dataset.known)); });
 
-  function renderHandlers() {
-    $('#handlers').replaceChildren(...Object.entries(CATS).map(([c, cat]) => {
-      const card = el('div', 'hcard');
-      const h = el('h3'); const ico = el('span', 'cat-ico'); ico.append(svg(cat.icon)); h.append(ico, el('span', '', cat.name));
-      const ul = el('ul', 'hlist');
-      const people = (queue.handlers || []).filter(x => x.category === c);
-      if (!people.length) ul.append(el('li', 'none', 'Nobody yet, so Super Admins handle these.'));
-      for (const p of people) {
-        const li = el('li'); const who = el('span');
-        who.append(el('span', '', p.name), el('span', 'sub', p.account ? p.email : `${p.email} · account switched off`));
-        const x = el('button', 'iconbtn small'); x.type = 'button'; x.setAttribute('aria-label', `Remove ${p.name} from ${cat.name}`); x.append(svg('i-close'));
-        x.addEventListener('click', () => setHandler(c, p.email, false, x));
-        li.append(who, x); ul.append(li);
-      }
-      const f = el('form', 'hadd'); f.noValidate = true;
-      const input = el('input', 'input'); input.type = 'email'; input.placeholder = 'name@flr.co.uk'; input.autocomplete = 'off'; input.setAttribute('aria-label', `Add a handler for ${cat.name}`);
-      const add = el('button', 'btn', 'Add'); add.type = 'submit';
-      const err = el('p', 'field-error'); err.hidden = true; err.id = `herr-${c}`; input.setAttribute('aria-describedby', err.id);
-      input.addEventListener('input', () => { err.hidden = true; });
-      f.append(input, add);
-      f.addEventListener('submit', e => { e.preventDefault(); setHandler(c, input.value, true, add, err); });
-      card.append(h, ul, f, err);
-      return card;
-    }));
-  }
-  async function setHandler(category, email, on, btn, err) {
-    btn.disabled = true;
-    try {
-      queue.handlers = await call('maintenance_set_handler', { p_category: category, p_email: email, p_on: on });
-      renderHandlers();
-      toast(on ? `Added to ${CATS[category].name}` : `Removed from ${CATS[category].name}`);
-    } catch (e) {
-      btn.disabled = false;
-      if (err) showErr(err, why(e)); else toast(why(e));
-    }
-  }
 
   /* ---------------------------------------------------------------- tabs */
   function setTab(t, focus) {

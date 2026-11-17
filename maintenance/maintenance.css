@@ -354,21 +354,6 @@ html.locked{overflow:hidden}
 .st-known{background:var(--fill);color:var(--ink-2)}
 .st-off{background:transparent;color:var(--ink-3);box-shadow:inset 0 0 0 1px var(--line)}
 
-/* who handles what: a card per category */
-.handlers{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
-.hcard{padding:14px 16px;border-radius:var(--r-card);background:var(--surface);box-shadow:inset 0 0 0 1px var(--line)}
-.hcard h3{display:flex;align-items:center;gap:8px;margin:0 0 10px;font:650 15.5px/1.3 var(--font-text)}
-.hcard h3 .cat-ico{width:28px;height:28px;border-radius:8px}
-.hcard h3 .cat-ico svg{width:16px;height:16px}
-.hlist{margin:0 0 10px;padding:0;list-style:none}
-.hlist li{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:38px;border-top:1px solid var(--line);font-size:14.5px}
-.hlist li:first-child{border-top:0}
-.hlist .sub{display:block;color:var(--ink-3);font-size:13px}
-.hlist .none{color:var(--ink-3)}
-.hadd{display:flex;gap:8px}
-.hadd .input{min-height:40px;padding:8px 12px;font-size:15px}
-.hadd .btn{min-height:40px}
-.hcard .field-error{margin-top:6px}
 .iconbtn.small{width:30px;height:30px}
 .iconbtn.small svg{width:13px;height:13px}
 
