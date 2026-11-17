@@ -22,8 +22,8 @@
   const AUTH_KEY = 'flr-estimator-auth';            // the one FLR sign-in for the whole site
   const SIGN_IN = '../?next=orders';
   const TZ = 'Europe/London';
-  const POLL_MS = 30 * 1000;                        // the page asks the database every 30 seconds; Monday is read every minute (1.10)
-  const STALE_MIN = 20;                             // older than this with no reason given: say it may be out of date
+  const POLL_MS = 30 * 1000;                        // the page asks the database every 30 seconds; Monday is read every 15 minutes (17 Nov 2026), or now by Refresh
+  const STALE_MIN = 35;                             // older than this with no reason given: say it may be out of date
   const ATTN_SHOWN = 3;                             // late orders shown before "Show all"
   const $ = (s, r = document) => r.querySelector(s);
   const wide = matchMedia('(min-width: 960px)');
@@ -294,7 +294,7 @@
         h('a', { class: 'brand', href: '../', 'aria-label': 'Back to the FLR Hub' }, icon('i-back', 'brand-back'), icon('flr-mark', 'brand-mark'), h('span', { class: 'brand-word' }, 'Hub')),
         h('div', { class: 'head-tools' }, updated(today),
           h('button', { class: 'round only-wide has-dot', type: 'button', 'aria-label': problemLabel(), title: 'Have a problem?', onclick: () => { const j = findJob(S.id); openProblem(j ? j.orders[0].id : null); } }, icon('i-help'), problemDot()),
-          h('button', { class: 'round', type: 'button', id: 'refresh', 'aria-label': 'Check for updates now', title: 'Check for updates now', onclick: () => refresh(true) }, icon('i-refresh')))),
+          h('button', { class: 'round', type: 'button', id: 'refresh', 'aria-label': 'Check for updates now', title: 'Check for updates now', onclick: () => readNow() }, icon('i-refresh')))),
       h('div', { class: 'head-titles' }, h('h1', { class: 'head-title' }, title), sub ? h('p', { class: 'head-sub' }, sub) : null),
       h('nav', { class: 'seg', 'aria-label': 'Deliveries' }, TABS.map(([k, label]) =>
         h('a', { class: 'seg-item', href: href(k), 'aria-current': S.tab === k ? 'page' : null }, label, counts[k] ? h('span', { class: 'seg-n' }, String(counts[k])) : null))));
@@ -963,7 +963,7 @@
       S.answers = (await fetchAnswers()) || S.answers;
       S.cancels = (await fetchCancels()) || S.cancels;
       S.data = d; S.gotAt = Date.now(); S.err = null;
-      if (!d.readAt && !d.orders.length) gate('No deliveries yet', d.failing ? `The tracker couldn’t read monday.com yet. ${d.failing}` : 'The tracker hasn’t read the Goods In board yet. It does every minute.', { retry: true });
+      if (!d.readAt && !d.orders.length) gate('No deliveries yet', d.failing ? `The tracker couldn’t read monday.com yet. ${d.failing}` : 'The tracker hasn’t read the Goods In board yet. It does every 15 minutes, or press Refresh.', { retry: true });
       else { render(); fetchPhotos().then(got => { if (got) render(); }); }
       if (chatOpen) chatOpen();
       if (byHand) toast(d.failing ? 'monday.com still isn’t answering' : 'Up to date');
@@ -975,6 +975,24 @@
       S.busy = false; busy(false);
       if (S.again) { S.again = false; refresh(false); }
     }
+  }
+  // Refresh by hand (Hub migration 3.2): ask the tracker to read monday.com now, then look again until it has. One ask
+  // serves everyone, at most every 2 minutes; within that, or before the update, it just shows the latest the Hub has.
+  async function readNow() {
+    if (S.asking) return;
+    S.asking = true;
+    const before = S.data && S.data.readAt;
+    let r = {};
+    try { r = (await client().rpc('hub_read_now', { p_app: 'orders' })).data || {}; } catch (e) { /* offline: refresh says so */ }
+    if (!r.asked) { S.asking = false; return refresh(true); }
+    toast('Checking monday.com…');
+    for (let i = 0; i < 10; i++) {
+      await new Promise(res => setTimeout(res, 3000));
+      await refresh(false);
+      if (S.data && S.data.readAt !== before) break;
+    }
+    S.asking = false;
+    toast(S.data && S.data.readAt !== before ? 'Up to date with monday.com' : 'Still checking monday.com: it’ll show here shortly');
   }
   function schedule() {
     clearInterval(S.timer);

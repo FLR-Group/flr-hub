@@ -165,7 +165,7 @@
     $('#subtitle').textContent = `Fitters booked each day, out of ${CAPACITY}.`;
     const at = new Date(DATA.readAt), src = $('#source');
     src.textContent = `Monday · updated ${when(at)}`;
-    src.title = `Daily totals from the Monday Work Programme, read every 15 minutes. Last read ${fmtDay.format(at)} at ${fmtTime.format(at)}`;
+    src.title = `Daily totals from the Monday Work Programme, read every 15 minutes, or now with the ↻ button. Last read ${fmtDay.format(at)} at ${fmtTime.format(at)}`;
     src.classList.toggle('stale', !!DATA.failingSince);
     // Reads failing: the last good read is still shown, and this says so.
     const note = $('#notice');
@@ -334,6 +334,23 @@
     } catch (e) { failGate(e); }
   }
   $('#gate-retry').addEventListener('click', () => { document.body.dataset.view = 'loading'; $('#gate-message').hidden = true; check(); });
+  // Check Monday now (Hub migration 3.2): ask the Planner to read the Work Programme straight away, then look every few
+  // seconds until it has. One ask serves everyone, at most every 2 minutes; within that it shows the latest the Hub has.
+  $('#readnow').addEventListener('click', async () => {
+    const btn = $('#readnow');
+    if (btn.getAttribute('aria-busy') === 'true') return;
+    btn.setAttribute('aria-busy', 'true'); btn.title = 'Checking Monday…';
+    const before = DATA && DATA.readAt;
+    let r = {};
+    try { r = (await client().rpc('hub_read_now', { p_app: 'capacity' })).data || {}; } catch (e) { /* offline: what's shown stays */ }
+    for (let i = 0; i < (r.asked ? 12 : 1); i++) {
+      if (r.asked) await new Promise(res => setTimeout(res, 3000));
+      await check(true);
+      if (DATA && DATA.readAt !== before) break;
+    }
+    btn.removeAttribute('aria-busy');
+    btn.title = DATA && DATA.readAt !== before ? 'Up to date with Monday' : r.asked ? 'Still checking Monday: it’ll show here shortly' : 'Check Monday now';
+  });
 
   async function boot() {
     const c = client();

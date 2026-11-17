@@ -1241,7 +1241,7 @@
         "out of date",
         "live"
       ],
-      "answer": "Speeding figures come from FleetView via the FLR Fleet Management updater, a Chrome add-on on an FLR Super Admin’s computer. It sends them every 15 minutes while that computer is on, so not overnight, at weekends or on FLR close days. Monday board vehicle details update every 15 minutes. If the figures stop updating in the working day, Admins and Super Admins see a notice; tell an FLR Super Admin if it stays.",
+      "answer": "Speeding figures come from FleetView via the FLR Fleet Management updater, a Chrome add-on on an FLR Super Admin’s computer. It sends them every 15 minutes while that computer is on, so not overnight, weekends or close days. Monday vehicle details: every 15 min, or “Check Monday now” on Vehicles. If the figures stop updating in the working day, Admins and Super Admins see a notice; tell a Super Admin if it stays.",
       "link": {
         "href": "speeding/",
         "label": "Open Fleet Management"
@@ -1846,7 +1846,7 @@
         "delivery",
         "coming in"
       ],
-      "answer": "The Order Tracker shows what’s arriving from the Monday “FLR - Goods In” board: Today’s deliveries, late or delayed ones under “Needs attention”, and Coming up and Received tabs. Tap a delivery for its materials, what’s still to arrive, the supplier, order reference and WFM job. It reads Monday every 5 minutes; deliveries recorded or corrected on the Hub, and problems reported, are added to the order there.",
+      "answer": "The Order Tracker shows what’s arriving from the Monday “FLR - Goods In” board: Today’s deliveries, late or delayed ones under “Needs attention”, and Coming up and Received tabs. Tap a delivery for its materials, what’s still to come, supplier, order ref and WFM job. It reads Monday every 15 min (↻ reads it now); deliveries recorded or corrected on the Hub, and problems reported, are added to the order there.",
       "link": {
         "tile": "orders",
         "label": "Open the Order Tracker"
@@ -2046,7 +2046,7 @@
         "real data",
         "up to date"
       ],
-      "answer": "The Planner is a month calendar of how many fitters are booked each day, out of 23. The figures are read from the Monday Work Programme every 15 minutes: each day counts the different fitters on fitting work. A battery fills as fitters are booked, with a badge such as 18/23; a gold number shows bookings with no fitter yet. “Monday · updated …” at the top says when it was last read.",
+      "answer": "The Planner is a month calendar of how many fitters are booked each day, out of 23. The figures are read from the Monday Work Programme every 15 minutes: each day counts the different fitters on fitting work. A battery fills as fitters are booked, with a badge such as 18/23; a gold number shows bookings with no fitter yet. “Monday · updated …” says when it was read; ↻ reads it now.",
       "link": {
         "tile": "capacity",
         "label": "Open the Planner"

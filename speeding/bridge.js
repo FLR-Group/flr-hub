@@ -187,4 +187,43 @@
     if (document.visibilityState === 'visible' && Date.now() - loadedAt >= FRESH_MS) reread();
   });
   setInterval(() => { if (document.visibilityState === 'visible' && Date.now() - loadedAt >= OPEN_MS) reread(); }, 60 * 1000);
+
+  // "Check Monday now" beside the Monday fleet board line (Hub migration 3.2): asks FLR's server to read the Fleet board
+  // straight away, then reads the data again every few seconds until the new sync is in. One ask serves everyone, at most
+  // every 2 minutes; within that it just reads what FLR already has. Added here so the page itself (built from
+  // ../flr-speeding-report) needs no change: the button is put back whenever the page redraws that line.
+  const fleetAt = () => { const m = data && data.docs && data.docs['fleet/meta']; return m ? m.fetchedAt || null : null; };
+  let checking = false;
+  async function checkMonday(btn) {
+    if (checking) return;
+    checking = true; btn.setAttribute('aria-busy', 'true'); btn.textContent = 'Checking Monday…';
+    const before = fleetAt();
+    let r = {};
+    try { r = (await client().rpc('hub_read_now', { p_app: 'speeding' })).data || {}; } catch (e) { /* offline: just reread */ }
+    for (let i = 0; i < (r.asked ? 10 : 1); i++) {
+      if (r.asked) await new Promise(res => setTimeout(res, 3000));
+      await reread();
+      if (fleetAt() !== before) break;
+    }
+    checking = false;
+    document.querySelectorAll('.flr-readnow').forEach(b => { b.removeAttribute('aria-busy'); b.textContent = fleetAt() !== before ? 'Up to date' : r.asked ? 'Still checking: it’ll show shortly' : 'Check Monday now'; });
+    setTimeout(() => document.querySelectorAll('.flr-readnow').forEach(b => { if (!checking) b.textContent = 'Check Monday now'; }), 5000);
+  }
+  function addButtons() {
+    for (const line of document.querySelectorAll('.avsec .syncline')) {
+      if (line.querySelector('.flr-readnow')) continue;
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'flr-readnow'; b.textContent = checking ? 'Checking Monday…' : 'Check Monday now';
+      if (checking) b.setAttribute('aria-busy', 'true');
+      b.addEventListener('click', () => checkMonday(b));
+      line.append(' ', b);
+    }
+  }
+  document.addEventListener('DOMContentLoaded', () => {
+    const st = document.createElement('style');
+    st.textContent = '.flr-readnow{margin-left:4px;padding:2px 10px;border:0;border-radius:999px;background:var(--fill,rgba(118,118,128,.16));color:var(--tint,#4550f0);font:600 12.5px/1.6 inherit;cursor:pointer}.flr-readnow[aria-busy="true"]{opacity:.7;cursor:progress}';
+    document.head.append(st);
+    new MutationObserver(addButtons).observe(document.body, { childList: true, subtree: true });
+    addButtons();
+  });
 })();

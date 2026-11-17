@@ -105,6 +105,12 @@ main{max-width:1180px;margin:0 auto;padding:28px max(var(--gutter),env(safe-area
   font:600 12.5px/1.2 var(--font-text);letter-spacing:.005em;white-space:nowrap;font-variant-numeric:tabular-nums}
 .source::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--live);box-shadow:0 0 0 3px color-mix(in srgb,var(--live) 22%,transparent)}
 .source.stale::before{background:var(--gold);box-shadow:0 0 0 3px color-mix(in srgb,var(--gold) 26%,transparent)}
+/* Check Monday now (Hub migration 3.2) */
+.readnow{display:grid;place-items:center;width:32px;height:32px;padding:0;border:0;border-radius:50%;background:var(--surface);color:var(--ink-2);box-shadow:var(--sh-1);cursor:pointer}
+.readnow svg{width:16px;height:16px}
+.readnow[aria-busy="true"] svg{animation:readnow-spin 1s linear infinite}
+@keyframes readnow-spin{to{transform:rotate(1turn)}}
+@media (prefers-reduced-motion:reduce){.readnow[aria-busy="true"] svg{animation:none;opacity:.5}}
 .head p{margin:0;color:var(--ink-2);font-size:15.5px;letter-spacing:-.005em}
 /* Planner 1.2: Monday reads failing. The last good read stays; this says since when (gold, as the "needs a fitter" mark). */
 .head p.notice{display:flex;align-items:flex-start;gap:9px;margin:6px 0 0;padding:10px 14px;border-radius:14px;background:var(--gold-soft);color:var(--gold-ink);

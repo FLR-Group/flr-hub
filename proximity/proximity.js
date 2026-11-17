@@ -222,7 +222,7 @@
     if (DATA.readAt) {
       const at = new Date(DATA.readAt);
       src.textContent = `Monday · updated ${when(at)}`;
-      src.title = `Bookings from the Monday Work Programme, read every 15 minutes. Last read ${fmtDayTime.format(at)}`;
+      src.title = `Bookings from the Monday Work Programme, read every 15 minutes, or now with Refresh. Last read ${fmtDayTime.format(at)}`;
     } else { src.textContent = 'Monday · not read yet'; }
     src.classList.toggle('stale', !!DATA.failingSince || !DATA.readAt);
     const fv = $('#fleetSource');
@@ -802,11 +802,21 @@
     btn.disabled = true; btn.classList.add('busy'); txt.textContent = 'Refreshing…';
     for (const k of [...ROAD.keys()]) if (k.endsWith('L')) ROAD.delete(k);   // traffic changes: ask again
     let ok = false;
-    try {
-      const { data, error } = await client().rpc('proximity_board');
-      if (error) { if (expired(error) || ['FLR_SIGN_IN_REQUIRED', 'FLR_FORBIDDEN'].includes(flrCode(error))) return failGate(error); }
-      else { const board = boardFrom(data); if (board) { show(board); ok = true; } }
-    } catch (e) { /* offline: say so below */ }
+    // Hub migration 3.2: also ask Nearby to read Monday and HubSpot now (one ask serves everyone, at most every 2 minutes),
+    // then look every few seconds until the new read is in.
+    const before = DATA && DATA.readAt;
+    let r = {};
+    try { r = (await client().rpc('hub_read_now', { p_app: 'proximity' })).data || {}; } catch (e) { /* the map still refreshes */ }
+    if (r.asked) txt.textContent = 'Checking Monday…';
+    for (let i = 0; i < (r.asked ? 10 : 1); i++) {
+      if (r.asked) await new Promise(res => setTimeout(res, 3000));
+      try {
+        const { data, error } = await client().rpc('proximity_board');
+        if (error) { if (expired(error) || ['FLR_SIGN_IN_REQUIRED', 'FLR_FORBIDDEN'].includes(flrCode(error))) return failGate(error); }
+        else { const board = boardFrom(data); if (board) { show(board); ok = true; } }
+      } catch (e) { /* offline: say so below */ }
+      if (DATA && DATA.readAt !== before) break;
+    }
     btn.classList.remove('busy'); btn.disabled = false;
     txt.textContent = ok ? `Updated ${fmtTime.format(new Date())}` : 'Couldn’t refresh';
     clearTimeout(refreshNow.t); refreshNow.t = setTimeout(() => { txt.textContent = 'Refresh'; }, 4000);

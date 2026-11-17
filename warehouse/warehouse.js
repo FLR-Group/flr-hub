@@ -289,7 +289,7 @@
     if (!b || !b.readAt) return;
     const at = new Date(b.readAt), src = $('#source');
     src.textContent = `Monday · updated ${when(b.readAt)}`;
-    src.title = `Tasks from the Monday Warehouse Weekly Task List, read every 2 minutes in working hours. Last read ${fmtTime.format(at)}.`;
+    src.title = `Tasks from the Monday Warehouse Weekly Task List, read every 15 minutes in working hours, or now with the ↻ button. Last read ${fmtTime.format(at)}.`;
     src.classList.toggle('stale', !!b.failingSince);
     const note = $('#notice');
     if (b.failingSince) {
@@ -529,6 +529,26 @@
     timer = setTimeout(refresh, ms || (fast ? FAST_MS : REFRESH_MS));
   }
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') schedule(50); });
+  // Check Monday now (Hub migration 3.2): ask Warehouse Tasks to read Monday straight away, then look every few seconds
+  // until it has. One ask serves everyone, at most every 2 minutes; within that it just shows the latest the Hub has.
+  $('#readnow').addEventListener('click', async () => {
+    const btn = $('#readnow');
+    if (btn.getAttribute('aria-busy') === 'true' || !THIS_WEEK) return;
+    btn.setAttribute('aria-busy', 'true');
+    const b0 = boards.get(THIS_WEEK), before = b0 && b0.readAt;
+    let r = {};
+    try { r = (await client().rpc('hub_read_now', { p_app: 'warehouse' })).data || {}; } catch (e) { /* offline: what's shown stays */ }
+    if (r.asked) say('Checking Monday…');
+    for (let i = 0; i < (r.asked ? 8 : 1); i++) {
+      if (r.asked) await new Promise(res => setTimeout(res, 3000));
+      await load(THIS_WEEK, true); render();
+      const b = boards.get(THIS_WEEK);
+      if (b && b.readAt !== before) break;
+    }
+    btn.removeAttribute('aria-busy');
+    const b = boards.get(THIS_WEEK);
+    say(b && b.readAt !== before ? 'Up to date with Monday.' : r.asked ? 'Still checking Monday: it’ll show here shortly.' : 'Up to date.');
+  });
   $('#gate-retry').addEventListener('click', () => { document.body.dataset.view = 'loading'; $('#gate-message').hidden = true; boot(); });
 
   async function boot() {
