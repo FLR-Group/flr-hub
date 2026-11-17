@@ -538,27 +538,48 @@
     }
   }
   let attnHome = null, attnAt = 0;
-  // Today: what's going on in the building, for everyone with Maintenance: its known issues (still open, or fixed today).
+  // Today: what's going on for everyone. Birthdays (hub_today: day and month only, from monday.com Team Details), then,
+  // for everyone with Maintenance, its known issues (still open, or fixed today).
   const KNOWN = { known: 'Known', fixing: 'Being fixed', fixed: 'Fixed' };
-  function renderToday(mt, tiles) {
-    const sec = $('#today-sec'), t = (tiles || []).find(x => x && x.id === 'maintenance');
-    if (!mt || !t || !safeTile(t)) { sec.hidden = true; return false; }
-    const items = (Array.isArray(mt.known) ? mt.known : []).filter(k => k && typeof k.title === 'string');
-    const list = $('#today-list');
-    if (items.length) list.replaceChildren(...items.map(k => attentionRow({ app: 'maintenance', href: t.url,
-      title: k.title, short: k.title, sub: `${KNOWN[k.status] || 'Known'}${k.text ? ` · ${k.text}` : ''}`, subShort: KNOWN[k.status] || 'Known' })));
-    else {
-      const li = el('li', 'attn-none');
-      li.append(svgUse('attn-ok', 'i-check'), el('span', 'attn-title', 'No known problems in the building today'));
-      list.replaceChildren(li);
+  const WEEKDAY = d => new Date(`${d}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'long' });
+  function birthdayRow(b) {
+    const li = el('li'), row = el('div', 'attn-row today-bday');
+    const icon = el('span', 'attn-icon attn-icon--birthday'); icon.setAttribute('aria-hidden', 'true'); icon.append(svgUse('', 'i-cake'));
+    const text = el('span', 'attn-text'), title = el('span', 'attn-title'), sub = el('span', 'attn-sub');
+    // Your own birthday is said to you.
+    const me = attnHome && String(attnHome.name || '').trim().toLowerCase() === b.name.trim().toLowerCase();
+    const t = b.today ? `Happy birthday, ${me ? b.first : b.name}${me ? '!' : ''}` : `${b.name} had a birthday on ${WEEKDAY(b.on)}`;
+    title.append(el('span', 'long', t), el('span', 'short', b.today ? `Happy birthday, ${b.first}${me ? '!' : ''}` : `${b.first}’s birthday, ${WEEKDAY(b.on)}`));
+    const subLong = me ? 'From everyone at FLR. Have a great day.' : b.today ? 'It’s their birthday today. Wish them a good one!' : 'At the weekend: wish them a happy belated birthday';
+    sub.append(el('span', 'long', subLong), el('span', 'short', me ? 'From everyone at FLR' : b.today ? 'Birthday today' : 'At the weekend'));
+    text.append(title, sub); row.append(icon, text); li.append(row);
+    return li;
+  }
+  function renderToday(a, tiles) {
+    const sec = $('#today-sec'), list = $('#today-list');
+    const mt = a && a.maintenance, t = (tiles || []).find(x => x && x.id === 'maintenance');
+    const bdays = (a && a.today && Array.isArray(a.today.birthdays) ? a.today.birthdays : []).filter(b => b && typeof b.name === 'string');
+    const maint = !!(mt && t && safeTile(t));
+    if (!maint && !bdays.length) { sec.hidden = true; return false; }
+    const rows = bdays.map(birthdayRow);
+    if (maint) {
+      const items = (Array.isArray(mt.known) ? mt.known : []).filter(k => k && typeof k.title === 'string');
+      if (items.length) rows.push(...items.map(k => attentionRow({ app: 'maintenance', href: t.url,
+        title: k.title, short: k.title, sub: `${KNOWN[k.status] || 'Known'}${k.text ? ` · ${k.text}` : ''}`, subShort: KNOWN[k.status] || 'Known' })));
+      else {
+        const li = el('li', 'attn-none');
+        li.append(svgUse('attn-ok', 'i-check'), el('span', 'attn-title', 'No known problems in the building today'));
+        rows.push(li);
+      }
     }
+    list.replaceChildren(...rows);
     sec.hidden = false;
     return true;
   }
   const sideOn = () => $('#home-grid').classList.toggle('with-attn', !$('#attn').hidden || !$('#today-sec').hidden);
   function renderAttention(a, at, tiles) {
     const sec = $('#attn');
-    renderToday(a && a.maintenance, tiles);
+    renderToday(a, tiles);
     const view = a && typeof a === 'object' ? attentionLines(a, tiles || []) : null;
     if (!view || !view.possible) { sec.hidden = true; sec.classList.remove('is-loading'); sideOn(); tileBadges(null); return; }
     const list = $('#attn-list');
@@ -600,7 +621,7 @@
     // and the known issues for Today. Asked at the same time; either can fail without the other.
     const ask = fn => client().rpc(fn).then(x => x, e => ({ error: e }));
     const hasMaint = home.tiles.some(t => t && t.id === 'maintenance');
-    const [r, mr] = await Promise.all([ask('hub_attention'), hasMaint ? ask('maintenance_home') : null]);
+    const [r, mr, tr] = await Promise.all([ask('hub_attention'), hasMaint ? ask('maintenance_home') : null, ask('hub_today')]);
     if (attnHome !== home) return;   // signed out or reloaded meanwhile
     const ok = !r.error && r.data && typeof r.data === 'object' && !Array.isArray(r.data);
     const m = mr && !mr.error && mr.data && Array.isArray(mr.data.reports) ? {
@@ -609,12 +630,14 @@
       known: (Array.isArray(mr.data.known) ? mr.data.known : []).filter(k => k && (k.status !== 'fixed' || sentAgo(k.updated) === 'today'))
         .slice(0, 6).map(k => ({ title: String(k.title || ''), text: String(k.text || ''), status: k.status })),
     } : null;
-    if (!ok && !m) {
+    const today = tr && !tr.error && tr.data && Array.isArray(tr.data.birthdays)
+      ? { date: String(tr.data.date || ''), birthdays: tr.data.birthdays.slice(0, 10).map(b => ({ name: String(b.name || ''), first: String(b.first || b.name || ''), on: String(b.on || ''), today: !!b.today })) } : null;
+    if (!ok && !m && !today) {
       if (r.error && missingFunction(r.error)) store.del(ATTN_SEEN);
       tabStore.del(ATTN_KEY); attnAt = 0; renderAttention(null); return;
     }
     if (ok) store.set(ATTN_SEEN, '1');
-    const a = { ...(ok ? r.data : {}), ...(m ? { maintenance: m } : {}) };
+    const a = { ...(ok ? r.data : {}), ...(m ? { maintenance: m } : {}), ...(today ? { today } : {}) };
     attnAt = Date.now();
     tabStore.set(ATTN_KEY, JSON.stringify({ who, at: attnAt, a }));
     renderAttention(a, attnAt, home.tiles);
