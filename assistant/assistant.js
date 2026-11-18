@@ -14,6 +14,7 @@
    (GitHub Pages caches files for 10 minutes).
    ========================================================================== */
 import './logo.js?v=2.2';
+import './seen.js?v=1.0';   // "last seen" for Hub settings (Hub migration 3.5)
 
 const JEFF = true;    // false keeps him off every page, whatever Hub settings says
 

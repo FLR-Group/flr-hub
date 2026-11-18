@@ -270,7 +270,22 @@
     else av.textContent = initials(nameOf(a));
     return av;
   }
-  const statusOf = (a, sh) => notApproved(a) ? ['Not approved', 'is-unapproved'] : sh.status === 'disabled' ? [STATUS.disabled, 'is-off'] : [STATUS.active, 'is-active'];
+  // Hub migration 3.5: "Active" only for someone using the Hub in the last 10 minutes (every Hub app reports it while
+  // it's open); otherwise when they were last seen. Switched off and not approved show as before.
+  const ACTIVE_MS = 10 * 60 * 1000;
+  const isActiveNow = a => a.id === S.you || (!!a.lastSeen && Date.now() - Date.parse(a.lastSeen) < ACTIVE_MS);   // you're here now
+  function seenShort(iso) {
+    if (!iso) return 'Never signed in';
+    const d = new Date(iso), now = new Date(), min = Math.max(1, Math.round((now - d) / 6e4));
+    if (min < 60) return `Seen ${min} min ago`;
+    const days = Math.round((new Date(now.toDateString()) - new Date(d.toDateString())) / 864e5);
+    if (days === 0) return `Seen ${Math.floor(min / 60)} h ago`;
+    if (days === 1) return 'Seen yesterday';
+    if (days < 7) return `Seen ${d.toLocaleDateString('en-GB', { weekday: 'long' })}`;
+    return `Seen ${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', ...(d.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}) })}`;
+  }
+  const statusOf = (a, sh) => notApproved(a) ? ['Not approved', 'is-unapproved'] : sh.status === 'disabled' ? [STATUS.disabled, 'is-off']
+    : isActiveNow(a) ? [STATUS.active, 'is-active'] : [seenShort(a.lastSeen), 'is-away'];
   function metaLine(a, sh) {
     const m = el('span', 'pa-meta');
     const [label, cls] = statusOf(a, sh);
@@ -872,6 +887,20 @@
   $('#act-person').addEventListener('change', e => { ACT.actor = e.target.value; loadActivity(true); });
   $('#act-views').addEventListener('change', e => { ACT.views = e.target.checked; loadActivity(true); });
   $('#act-more').addEventListener('click', () => loadActivity(false));
+  // Keep "Active" / "Seen … ago" current while the page is open: the times every minute, and who's been seen every two
+  // (only the last-seen times are taken from that read; nothing being edited is touched).
+  let seenTick = 0;
+  setInterval(async () => {
+    if (document.visibilityState !== 'visible' || !S.accounts || S.saving) return;
+    if (++seenTick % 2 === 0) {
+      try {
+        const acc = await call('admin_accounts');
+        const fresh = new Map((acc.accounts || []).map(x => [x.id, x.lastSeen]));
+        for (const a of S.accounts) if (fresh.has(a.id)) a.lastSeen = fresh.get(a.id);
+      } catch (e) { /* keep what's shown */ }
+    }
+    render({ keepDetail: true });
+  }, 60 * 1000);
   async function reloadAccounts() {
     const acc = await call('admin_accounts');
     S.you = acc.you; S.apps = acc.apps || []; S.accounts = acc.accounts || [];
