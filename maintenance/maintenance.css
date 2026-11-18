@@ -68,6 +68,9 @@ main{max-width:1080px;margin:0 auto;padding:24px max(var(--gutter),env(safe-area
 @media (hover:hover){.btn-brand:hover{background:var(--tint-fill);filter:brightness(1.12)}}
 .btn-brand:active{background:var(--tint-fill);filter:brightness(.92)}
 .btn-block{width:100%;min-height:50px;font-size:16px}
+.btn-delete{margin-top:10px;background:none;color:var(--red-ink);font-weight:600}
+@media (hover:hover){.btn-delete:hover{background:var(--fill)}}
+.btn-delete.armed{background:var(--red);color:#fff}
 .btn .spin{display:none;width:19px;height:19px}
 .btn.busy .spin{display:block;animation:spin .9s steps(8) infinite}
 .btn.busy{pointer-events:none;opacity:.85}

@@ -10,12 +10,12 @@
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://*.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none'">
 <link rel="icon" href="../assets/flr-icon-192.png">
-<link rel="stylesheet" href="maintenance.css?v=1.5">
+<link rel="stylesheet" href="maintenance.css?v=1.6">
 <link rel="stylesheet" href="../tool-transition.css">
 <script src="../flr-config.js"></script>
 <script src="../vendor/supabase-2.116.0.js" defer></script>
 <script src="building.js?v=1.0" defer></script>
-<script src="maintenance.js?v=1.6" defer></script>
+<script src="maintenance.js?v=1.7" defer></script>
 <script type="module" src="../assistant/assistant.js?v=2.4"></script>
 </head>
 <body data-view="loading">
@@ -243,6 +243,7 @@
       </fieldset>
       <label class="check"><input type="checkbox" id="k-active" checked><span>Show it on the Maintenance page</span></label>
       <div class="panel-actions"><button class="btn btn-brand btn-block" type="submit" id="k-save"><svg class="spin" aria-hidden="true"><use href="#i-spin"/></svg><span class="btn-label">Save</span></button></div>
+      <button class="btn btn-delete btn-block" type="button" id="k-delete" hidden><svg class="spin" aria-hidden="true"><use href="#i-spin"/></svg><span class="btn-label">Delete this known issue</span></button>
     </form>
 
     <!-- A report's details -->

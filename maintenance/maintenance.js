@@ -882,6 +882,7 @@
     kform.querySelector(`input[name="k-status"][value="${k ? k.status : 'fixing'}"]`).checked = true;
     $('#k-active').checked = k ? k.active : true;
     $('#kform-error').hidden = true;
+    disarmDelete(); $('#k-delete').hidden = !k;
     openPanel('kform', k ? 'Known issue' : 'Add a known issue');
     setTimeout(() => $('#k-title').focus({ preventScroll: true }), 60);
   }
@@ -900,6 +901,29 @@
       toast(editing ? 'Known issue saved' : 'Known issue added');
     } catch (er) { kErr(`Not saved. ${why(er)}`); }
     finally { busy(btn, false, 'Save'); }
+  });
+
+  // Delete (Maintenance 1.4): the first press asks, a second within 5 seconds deletes it for good.
+  let deleteArmed = 0;
+  function disarmDelete() {
+    clearTimeout(deleteArmed); deleteArmed = 0;
+    const b = $('#k-delete'); b.classList.remove('armed'); b.querySelector('.btn-label').textContent = 'Delete this known issue';
+  }
+  $('#k-delete').addEventListener('click', async () => {
+    const btn = $('#k-delete'); if (btn.disabled || !editing) return;
+    if (!deleteArmed) {
+      btn.classList.add('armed'); btn.querySelector('.btn-label').textContent = 'Press again to delete it for good';
+      deleteArmed = setTimeout(disarmDelete, 5000); return;
+    }
+    clearTimeout(deleteArmed); deleteArmed = 0;
+    busy(btn, true, 'Deleting…');
+    try {
+      await call('maintenance_known_delete', { p_id: editing });
+      await load(true); render(); closePanel();
+      toast('Known issue deleted');
+    } catch (er) {
+      kErr(missingFunction(er) ? 'Deleting isn’t switched on in the FLR database yet.' : `Not deleted. ${why(er)}`);
+    } finally { busy(btn, false); disarmDelete(); }
   });
 
   /* ---------------------------------------------------------------- start */
