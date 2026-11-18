@@ -545,7 +545,7 @@
   }
   let attnHome = null, attnAt = 0;
   // Today: what's going on for everyone. Birthdays (hub_today: day and month only, from monday.com Team Details), then,
-  // for everyone with Maintenance, its known issues (still open, or fixed today).
+  // for everyone with Maintenance, its known issues that are still open (a fixed one leaves Today at once).
   const KNOWN = { known: 'Known', fixing: 'Being fixed', fixed: 'Fixed' };
   const WEEKDAY = d => new Date(`${d}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'long' });
   function birthdayRow(b) {
@@ -571,7 +571,7 @@
     if (!maint && !bdays.length) { sec.hidden = true; return false; }
     const rows = bdays.map(birthdayRow);
     if (maint) {
-      const items = (Array.isArray(mt.known) ? mt.known : []).filter(k => k && typeof k.title === 'string');
+      const items = (Array.isArray(mt.known) ? mt.known : []).filter(k => k && typeof k.title === 'string' && k.status !== 'fixed');   // also a saved copy from before
       if (items.length) rows.push(...items.map(k => attentionRow({ app: 'maintenance', href: t.url,
         title: k.title, short: k.title, sub: `${KNOWN[k.status] || 'Known'}${k.text ? ` · ${k.text}` : ''}`, subShort: KNOWN[k.status] || 'Known' })));
       else {
@@ -636,7 +636,7 @@
       newReports: count(mr.data.waitingForYou),
       replyNeeded: mr.data.reports.filter(x => x && x.status === 'waiting').length,
       reviewed: (Array.isArray(mr.data.reviewed) ? mr.data.reviewed : []).filter(Number.isInteger).slice(0, 20),   // Maintenance 1.3; absent before
-      known: (Array.isArray(mr.data.known) ? mr.data.known : []).filter(k => k && (k.status !== 'fixed' || sentAgo(k.updated) === 'today'))
+      known: (Array.isArray(mr.data.known) ? mr.data.known : []).filter(k => k && k.status !== 'fixed')
         .slice(0, 6).map(k => ({ title: String(k.title || ''), text: String(k.text || ''), status: k.status })),
     } : null;
     const today = tr && !tr.error && tr.data && Array.isArray(tr.data.birthdays)
