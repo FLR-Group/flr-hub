@@ -550,11 +550,13 @@
         h('h1', { class: 'od-title', id, tabindex: '-1' }, job.name),
         h('p', { class: 'od-job' }, [job.wfm ? `WFM ${job.wfm}${job.stock ? ' (FLR stock)' : ''}` : 'No WFM job number', plural(job.orders.length, 'order'), `${got} of ${plural(mats.length, 'material')} in`].join(' · '),
           job.names.length > 1 ? h('span', { class: 'od-aka' }, `Also on monday.com as ${job.names.slice(1).join(', ')}`) : null),
-        sv.length ? h('div', { class: 'od-sv' }, sv.map(p => h('span', { class: 'sv-chip' }, face(p, 'sv-md'),
-          h('span', { class: 'sv-text' }, h('span', { class: 'sv-role' }, 'Surveyor'), h('span', { class: 'sv-name' }, p.name))))) : null,
+        sv.length ? h('div', { class: 'od-sv' }, sv.map(p => h('button', { class: 'sv-chip', type: 'button', 'aria-label': `${p.name}, surveyor: see all their jobs`,
+          onclick: () => openPerson({ kind: 'surveyor', code: p.code, name: p.name, photo: p.photo }) }, face(p, 'sv-md'),
+          h('span', { class: 'sv-text' }, h('span', { class: 'sv-role' }, 'Surveyor'), h('span', { class: 'sv-name' }, p.name)), icon('i-chevron', 'sv-go')))) : null,
         ft.people.length ? h('div', { class: 'od-ft' }, h('p', { class: 'ft-head' }, ft.last ? 'Fitters on the last visit' : 'Fitters booked'),
-          h('div', { class: 'od-sv' }, ft.people.map(p => h('span', { class: 'sv-chip' }, face(p, 'sv-md'),
-            h('span', { class: 'sv-text' }, h('span', { class: 'sv-role' }, visitWhen(p, today, ft.last)), h('span', { class: 'sv-name' }, p.name)))))) : null),
+          h('div', { class: 'od-sv' }, ft.people.map(p => h('button', { class: 'sv-chip', type: 'button', 'aria-label': `${p.name}, fitter: see all their jobs`,
+            onclick: () => openPerson({ kind: 'fitter', name: p.name, photo: p.photo }) }, face(p, 'sv-md'),
+            h('span', { class: 'sv-text' }, h('span', { class: 'sv-role' }, visitWhen(p, today, ft.last)), h('span', { class: 'sv-name' }, p.name)), icon('i-chevron', 'sv-go'))))) : null),
       h('div', { class: 'od-body' },
         h('p', { class: 'tick-help' }, 'Tick each material as it arrives; tap again to untick. A tick records that it arrived, not its condition; anything wrong, use the help line.'),
         ...[...open, ...done].map(x => orderBlock(x.o, today, job.orders.length === 1))));
@@ -727,6 +729,77 @@
       err, go);
     dlg.append(form);
     dlg.addEventListener('close', () => dlg.remove());
+    document.body.append(dlg);
+    dlg.showModal();
+  }
+  /* ---------------------------------------------------------------- one person's jobs (1.13) */
+  // Tap a surveyor or fitter on a job: every job on the Goods In board they're on, now and past, and whether its
+  // materials came in. A surveyor by their code on the job's Work Programme job; a fitter by name on its visits.
+  function personJobs(person, today) {
+    const out = [];
+    for (const j of jobs().values()) {
+      let role = null, from = null, to = null;
+      if (person.kind === 'surveyor') { if (surveyorsOf(j).some(p => p.code === person.code)) role = 'Surveyor'; }
+      else {
+        const vs = []; const seen = new Set();
+        for (const o of j.orders) for (const v of o.visits || []) { const k = `${v.from}|${v.to}`; if (v.fitters.includes(person.name) && !seen.has(k)) { seen.add(k); vs.push(v); } }
+        if (vs.length) {
+          vs.sort((a, b) => a.from.localeCompare(b.from));
+          const next = vs.find(v => v.to >= today);
+          const v = next || vs[vs.length - 1]; from = v.from; to = v.to;
+          const span = from === to ? dayShort(from) : `${dayShort(from)} – ${dayShort(to)}`;
+          role = next ? (from <= today ? (to === today ? 'Fitting today' : `Fitting until ${dayShort(to)}`) : `Fitting ${span}`) : `Fitted ${span}`;
+          if (vs.length > 1) role += ` · ${plural(vs.length, 'visit')}`;
+        }
+      }
+      if (!role) continue;
+      let n = 0, got = 0, allIn = true, late = null, due = null, last = null, cancelled = 0;
+      for (const o of j.orders) {
+        const st = status(o, today), lines = linesOf(o);
+        n += lines.length; got += st.kind === 'received' ? lines.length : lines.filter(i => i.received).length;
+        cancelled += (o.cancelled || []).length;
+        if (st.kind !== 'received') { allIn = false; if (st.kind === 'overdue' && (!late || o.day < late)) late = o.day; else if (o.day && (!due || o.day < due)) due = o.day; }
+        const d = st.kind === 'received' ? (st.recDay || o.day) : o.day; if (d && (!last || d > last)) last = d;
+      }
+      const goods = allIn ? ['good', `${n > 1 ? `All ${n} in` : 'Came in'}${last ? ` · ${last === today ? 'today' : dayShort(last)}` : ''}`]
+        : late ? ['bad', got ? `${got} of ${n} in · rest was due ${dayShort(late)}` : `Not in · was due ${dayShort(late)}`]
+        : got ? ['warn', `${got} of ${n} in`]
+        : due ? ['calm', due === today ? 'Due today' : `Due ${dayShort(due)}`] : ['calm', 'No delivery date yet'];
+      const now = !allIn || (to && to >= today);
+      out.push({ job: j, role, goods, cancelled, now, sortDay: (now ? (from || due || late || last) : (to || last)) || '' });
+    }
+    const nowJobs = out.filter(x => x.now).sort((a, b) => a.sortDay.localeCompare(b.sortDay) || a.job.name.localeCompare(b.job.name));
+    const past = out.filter(x => !x.now).sort((a, b) => b.sortDay.localeCompare(a.sortDay) || a.job.name.localeCompare(b.job.name));
+    return { nowJobs, past, all: out };
+  }
+  function openPerson(person) {
+    const today = londonDay();
+    const { nowJobs, past, all } = personJobs(person, today);
+    const dlg = h('dialog', { class: 'rec pj', 'aria-labelledby': 'pj-title' });
+    const count = k => all.filter(x => x.goods[0] === k).length;
+    const pills = [['good', count('good'), 'all in'], ['warn', count('warn'), 'part in'], ['bad', count('bad'), 'late'], ['calm', count('calm'), 'to come']]
+      .filter(x => x[1]).map(([k, c, t]) => h('span', { class: `pj-pill pj-${k}` }, h('b', null, String(c)), ` ${t}`));
+    const row = x => h('li', null, h('a', { class: 'pj-row', href: href(S.tab === 'cancelled' ? 'received' : S.tab, x.job.key), onclick: () => dlg.close() },
+      h('span', { class: 'pj-main' },
+        h('span', { class: 'pj-job' }, x.job.name),
+        h('span', { class: 'pj-role' }, [x.job.wfm ? `WFM ${x.job.wfm}` : null, x.role].filter(Boolean).join(' · ')),
+        h('span', { class: `pj-goods pj-${x.goods[0]}` }, h('span', { class: 'pj-dot', 'aria-hidden': 'true' }), x.goods[1],
+          x.cancelled ? h('span', { class: 'pj-cx' }, ` · ${x.cancelled} cancelled`) : null)),
+      icon('i-chevron', 'pj-go')));
+    const section = (title, xs) => xs.length ? h('section', { class: 'pj-sec' }, h('h3', { class: 'pj-h' }, title, h('span', { class: 'pj-n' }, String(xs.length))), h('ul', { class: 'pj-list' }, xs.map(row))) : null;
+    dlg.append(h('div', { class: 'rec-form pj-body' },
+      h('div', { class: 'pj-head' },
+        face(person, 'pj-face'),
+        h('div', { class: 'pj-titles' }, h('h2', { class: 'rec-title', id: 'pj-title' }, person.name),
+          h('p', { class: 'pj-sub' }, `${person.kind === 'surveyor' ? 'Surveyor' : 'Fitter'} · ${plural(all.length, 'job')}`)),
+        h('button', { class: 'round pj-x', type: 'button', 'aria-label': 'Close', onclick: () => dlg.close() }, icon('i-close'))),
+      pills.length ? h('div', { class: 'pj-pills' }, pills) : null,
+      all.length ? [section('Now and coming up', nowJobs), section('Done', past)]
+        : h('p', { class: 'pj-empty' }, `No jobs with ${person.name} on the Goods In board.`),
+      h('p', { class: 'rec-label-hint pj-note' }, person.kind === 'surveyor'
+        ? 'Jobs on the Goods In board where they’re the surveyor on the Work Programme.' : 'Jobs on the Goods In board where they’re on a Work Programme visit.')));
+    dlg.addEventListener('close', () => dlg.remove());
+    dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
     document.body.append(dlg);
     dlg.showModal();
   }
