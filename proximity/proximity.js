@@ -1,6 +1,6 @@
 /* ============================================================================
    FLR Hub: Nearby (Hub tile 'proximity'). Enter a site postcode and see:
-     - Right now: the vans nearest the site, from FleetView's live positions (Admins and Super Admins only);
+     - Right now: the vans nearest the site, from FleetView's live positions (everyone on Nearby since 1.4; Admins only before);
      - Booked today: the fitter booked nearest the site today, from the Monday Work Programme;
      - Next 14 days: who is booked nearest on each of the next 14 days;
      - Home (Nearby 1.3): which fitter lives nearest, from the Monday board FLR - Team Details (Flooring Operatives).
@@ -837,8 +837,9 @@
     try {
       const { data, error } = await client().rpc('proximity_photos');
       if (error || !data || typeof data !== 'object') return;
-      PHOTOS = data;
+      PHOTOS = data; PHOTO_FOR.clear();
       if (lastSearch) search(lastSearch, true);
+      else if (DATA) drawLive();   // the start map's photo pins, drawn before the photos came
     } catch (e) { /* no photos: outlines stay */ }
   }
   $('#gate-retry').addEventListener('click', () => { document.body.dataset.view = 'loading'; $('#gate-message').hidden = true; check(); });

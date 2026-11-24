@@ -2256,7 +2256,7 @@
         "lives nearest",
         "home"
       ],
-      "answer": "Nearby shows who is nearest a site. Type the postcode from an enquiry (and the first line of the address for the exact spot), then switch between three views: Live (Admins and Super Admins get the nearest vehicles right now from FleetView; others see who is working nearest today), Booked (who is booked nearest today and on each of the next 14 days, from the Monday Work Programme and HubSpot surveys) and Home (which fitter lives nearest, from the Monday Team Details board). Distances and drive times are the best road route.",
+      "answer": "Nearby shows who is nearest a site. Type the postcode from an enquiry (and the first line of the address for the exact spot), then switch between three views: Live (the nearest vans and cars right now, from FleetView), Booked (who is booked nearest today and on each of the next 14 days, from the Monday Work Programme and HubSpot surveys) and Home (which fitter lives nearest, from the Monday Team Details board). Distances and drive times are the best road route.",
       "link": {
         "tile": "proximity",
         "label": "Open Nearby"
