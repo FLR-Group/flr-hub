@@ -1816,7 +1816,8 @@ function workerBase() {
 // or comes back cut short (it must hold everything the first one does), today onwards is unaffected and the earlier
 // days say what's missing (data.past: "ok", "partial", "none" or "error").
 async function load(fresh) {
-  const key = store.get("key", "");
+  let key = store.get("key", "");
+  if (!key && hubSignedIn()) { key = await hubPasscode(); if (key) store.set("key", key); }
   if (!key) { openSheet("key"); return; }
   const btn = document.getElementById("refreshBtn");
   btn.classList.add("spinning"); btn.disabled = true; setStatus("Updating…");
@@ -1829,6 +1830,10 @@ async function load(fresh) {
   try {
     const today = londonToday(), back = addDays(today, -DAYS_BACK);
     const [now, before] = await Promise.all([get(today), get(back).catch(() => null)]);
+    if (now === 401) {
+      const given = await hubPasscode();   // changed in Hub settings since this device saved it: use the new one
+      if (given && given !== key) { store.set("key", given); return await load(fresh); }
+    }
     if (now === 401) { store.set("key", ""); notice("The passcode was not accepted. <button class='link' id='retryKey'>Enter it again</button>", "err"); document.getElementById("retryKey").onclick = () => openSheet("key"); setStatus("Not signed in"); return; }
     data = withPast(now, before === 401 ? null : before, today, back);
     data.fetchedAt = new Date().toISOString();
@@ -1938,10 +1943,12 @@ const faceKey = n => String(n || "").trim().replace(/\s+/g, " ").toLowerCase();
 function faceOf(f) { return faces && f ? faces.get(faceKey(f.name)) || null : null; }
 function hubSignedIn() { try { return !!localStorage.getItem("flr-estimator-auth"); } catch (e) { return false; } }
 function addScript(src) { return new Promise((ok, fail) => { const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = fail; document.head.appendChild(s); }); }
-async function loadFaces() {
-  const hub = window.FLR_HUB;   // set only on the live site: where the Hub's sign-in files are
-  if (!hub || !hubSignedIn()) return;
-  try {
+// The Hub's database connection, made once: null when this browser isn't signed in to the Hub (or off the live site).
+let hubConnectP = null;
+function hubConnect() {
+  return hubConnectP || (hubConnectP = (async () => {
+    const hub = window.FLR_HUB;   // set only on the live site: where the Hub's sign-in files are
+    if (!hub || !hubSignedIn()) return null;
     if (!window.FLR_CONFIG) await addScript(hub.config);
     if (!window.supabase) await addScript(hub.supabase);
     const cfg = window.FLR_CONFIG || {};
@@ -1949,8 +1956,22 @@ async function loadFaces() {
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, storageKey: "flr-estimator-auth" },
     });
     const { data: got } = await c.auth.getSession();
-    if (!got || !got.session) return;
-    hubClient = c;
+    if (!got || !got.session) return null;
+    return (hubClient = c);
+  })().catch(() => null));
+}
+// Signed in to the Hub with the Fitter Schedule, nobody types the team passcode: the FLR database hands it over
+// (public.fitter_passcode, which a Super Admin keeps in Hub settings). Anyone else still enters it as before.
+async function hubPasscode() {
+  const c = await hubConnect();
+  if (!c) return "";
+  try { const { data, error } = await c.rpc("fitter_passcode"); return !error && typeof data === "string" ? data.trim() : ""; }
+  catch (e) { return ""; }
+}
+async function loadFaces() {
+  const c = await hubConnect();
+  if (!c) return;
+  try {
     const { data: r, error } = await c.rpc("fitter_faces");
     if (!error && r && Array.isArray(r.people)) {
       const m = new Map();

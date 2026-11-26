@@ -106,7 +106,7 @@
     $('#gate').hidden = false; $('#gate-message').hidden = false;
     $('#gate-title').textContent = title; $('#gate-text').textContent = text;
     $('#gate-retry').hidden = !o.retry;
-    $('#accounts-section').hidden = true; $('#registration-section').hidden = true; $('#jeff-section').hidden = true; $('#waiting-section').hidden = true;
+    $('#accounts-section').hidden = true; $('#registration-section').hidden = true; $('#jeff-section').hidden = true; $('#fitter-section').hidden = true; $('#waiting-section').hidden = true;
   }
 
   function switchEl(on, label, data) {
@@ -695,6 +695,20 @@
       : S.jeff ? 'Showing on every page for everyone.' : 'Hidden for everyone until you switch him back on.';
     sub.classList.toggle('is-warn', S.jeff === null);
   }
+  // The Fitter Schedule's team passcode, handed to signed-in staff (fitter_passcode). S.fpass: { set, setAt }, or null
+  // when the FLR database hasn't got this yet.
+  function renderFitterPass() {
+    const st = $('#fp-status'), btn = $('#fp-change'), f = S.fpass;
+    btn.disabled = !f; btn.textContent = f && f.set ? 'Change' : 'Enter';
+    st.textContent = !f ? 'Needs the “Fitter Schedule passcode” update to the FLR database.'
+      : f.set ? `Set${f.setAt ? ' ' + day(f.setAt) : ''}: signed-in staff don’t type it` : 'Not set: everyone types it';
+    st.classList.toggle('is-warn', !f || !f.set);
+  }
+  async function loadFitterPass() {
+    try { S.fpass = await call('admin_fitter_passcode_status'); } catch (e) { S.fpass = null; }
+    renderFitterPass();
+  }
+
   async function loadJeff() {
     try { S.jeff = (await call('likkle_jeff_on')) !== false; } catch (e) { S.jeff = null; }
     renderJeff();
@@ -754,8 +768,8 @@
       return gate('Hub settings didn’t load', offline(e) ? 'Can’t reach the FLR database. Check your connection and try again.' : 'Something went wrong. Try again in a moment.', { retry: true });
     }
     $('#gate').hidden = true;
-    $('#accounts-section').hidden = false; $('#registration-section').hidden = false; $('#jeff-section').hidden = false;
-    renderSettings(); renderAccounts(); renderPre(); loadJeff(); loadPhotos(); loadTeams(); loadRenaming(); loadActivity(true);
+    $('#accounts-section').hidden = false; $('#registration-section').hidden = false; $('#jeff-section').hidden = false; $('#fitter-section').hidden = false;
+    renderSettings(); renderAccounts(); renderPre(); loadJeff(); loadFitterPass(); loadPhotos(); loadTeams(); loadRenaming(); loadActivity(true);
     view('ready');
   }
   // Staff photos (Hub migration 2.5). Before that update, or if it fails, everyone keeps their initials.
@@ -1259,6 +1273,25 @@
       sheets.close($('#sheet-code'));
       toast('New access code set: share it with staff in person');
     } catch (err) { formError(said(err)); }
+    finally { btn.removeAttribute('aria-busy'); }
+  });
+  $('#fp-change').addEventListener('click', () => { $('#fp-form').reset(); fpError(''); sheets.open($('#sheet-fpass')); });
+  $('#fp-show').addEventListener('click', e => {
+    const f = $('#fp-code'), show = f.type === 'password';
+    f.type = show ? 'text' : 'password'; e.currentTarget.textContent = show ? 'Hide' : 'Show';
+  });
+  function fpError(text) { const p = $('#fp-error'); p.querySelector('span').textContent = text; p.hidden = !text; }
+  $('#fp-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const btn = e.currentTarget.querySelector('button[type="submit"]'), code = $('#fp-code').value;
+    if (btn.getAttribute('aria-busy') === 'true') return;
+    if (code.trim().length < 4) { fpError('Enter the passcode.'); $('#fp-code').focus(); return; }
+    fpError(''); btn.setAttribute('aria-busy', 'true');
+    try {
+      S.fpass = await call('admin_set_fitter_passcode', { p_code: code }); renderFitterPass();
+      $('#fp-form').reset(); sheets.close($('#sheet-fpass'));
+      toast('Saved: signed-in staff no longer type the passcode');
+    } catch (err) { fpError(said(err)); }
     finally { btn.removeAttribute('aria-busy'); }
   });
   $('#pre-form').addEventListener('submit', async e => {

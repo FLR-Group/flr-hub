@@ -238,6 +238,18 @@
     </div>
     <p class="hint">For everyone at once. Pages already open change the next time they’re opened or refreshed.</p>
   </section>
+
+  <section class="section" id="fitter-section" aria-labelledby="fitter-title" hidden>
+    <div class="section-head"><h2 class="section-title" id="fitter-title">Fitter Schedule</h2></div>
+    <p class="section-note">Anyone signed in to the Hub with the Fitter Schedule gets the team passcode filled in for them. People without a Hub account still type it.</p>
+    <div class="group">
+      <div class="row row-static">
+        <span class="row-main"><span class="row-title">Team passcode</span><span class="row-sub" id="fp-status"></span></span>
+        <button class="btn btn-small" type="button" id="fp-change">Enter</button>
+      </div>
+    </div>
+    <p class="hint">Enter the same passcode the schedule already uses. Changing it here doesn’t change the passcode itself: whoever looks after the schedule’s Cloudflare service does that.</p>
+  </section>
 </main>
 
 <footer class="foot"><p>FLR Group · Tools for staff</p></footer>
@@ -255,6 +267,21 @@
       <p class="hint" id="sc-hint">At least 12 characters. The old code stops working at once.</p>
       <p class="form-error" id="sc-error" role="alert" hidden><svg aria-hidden="true"><use href="#i-alert"/></svg><span></span></p>
       <button class="btn btn-primary btn-block" type="submit"><svg class="spin" aria-hidden="true"><use href="#i-spin"/></svg><span class="btn-label">Set the new code</span></button>
+    </form>
+  </div>
+</dialog>
+<dialog class="sheet" id="sheet-fpass" aria-labelledby="fp-title">
+  <div class="scrim" data-close></div>
+  <div class="panel">
+    <div class="sheet-head"><span class="grabber" aria-hidden="true"></span><h2 class="sheet-title" id="fp-title">Fitter Schedule passcode</h2><button class="close" type="button" data-close aria-label="Close"><svg aria-hidden="true"><use href="#i-close"/></svg></button></div>
+    <form class="sheet-body form" id="fp-form" novalidate>
+      <p class="sheet-lede">The team passcode the Fitter Schedule already uses. It’s handed only to signed-in staff with the Fitter Schedule, and nobody can read it back here.</p>
+      <div class="group">
+        <label class="row"><span class="row-label">Code</span><input type="password" id="fp-code" autocomplete="new-password" minlength="4" maxlength="200" required aria-describedby="fp-hint"><button class="link" type="button" id="fp-show">Show</button></label>
+      </div>
+      <p class="hint" id="fp-hint">If it doesn’t match the schedule’s passcode, people are asked to type it as before.</p>
+      <p class="form-error" id="fp-error" role="alert" hidden><svg aria-hidden="true"><use href="#i-alert"/></svg><span></span></p>
+      <button class="btn btn-primary btn-block" type="submit"><svg class="spin" aria-hidden="true"><use href="#i-spin"/></svg><span class="btn-label">Save the passcode</span></button>
     </form>
   </div>
 </dialog>
