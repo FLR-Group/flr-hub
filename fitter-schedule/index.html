@@ -639,10 +639,17 @@ button.arow:active{background:var(--fill)}
 .vday .vd-sum li i{width:7px;height:7px;border-radius:50%;background:var(--ink-3)}
 .vday .vd-sum li.home i{background:var(--tint)}.vday .vd-sum li.site i{background:var(--green-ink)}.vday .vd-sum li.unit i{background:var(--ink)}
 .vday ol.vd-line{list-style:none;margin:0;padding:0}
-.vday .vd-line>li{position:relative;display:grid;grid-template-columns:46px 18px minmax(0,1fr);column-gap:8px;align-items:start}
-.vday .vd-line .t{padding-top:1px;font-size:14px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;text-align:right}
+.vday .vd-line>li{position:relative;display:grid;grid-template-columns:18px minmax(0,1fr);column-gap:10px;align-items:start}
+.vday .vd-line .tm{display:flex;flex-wrap:wrap;gap:4px 18px;margin:4px 0 2px}
+.vday .vd-line .tm>span{display:flex;flex-direction:column;min-width:64px}
+.vday .vd-line .tm .l{font-size:10.5px;line-height:1.2;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+.vday .vd-line .tm .v{font-size:16px;line-height:1.3;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
+.vday .vd-line .tm .c-for .v{font-weight:500;color:var(--ink-2)}
+.vday .vd-line .tm .c-arr .v{color:var(--green-ink)}
+.vday .vd-line>li.stop .tm .c-arr .v{color:var(--gold-ink)}
+.vday .vd-line .x{font-size:12.5px;line-height:1.35;color:var(--ink-3)}
 .vday .vd-line .k{position:relative;align-self:stretch}
-.vday .vd-line .k::before{content:"";position:absolute;left:4px;top:5px;width:10px;height:10px;border-radius:50%;background:var(--ink-3);box-shadow:0 0 0 3px var(--surface)}
+.vday .vd-line .k::before{content:"";position:absolute;left:4px;top:6px;width:10px;height:10px;border-radius:50%;background:var(--ink-3);box-shadow:0 0 0 3px var(--surface)}
 .vday .vd-line>li:not(:last-child) .k::after{content:"";position:absolute;left:8.5px;top:17px;bottom:-3px;width:1.5px;background:var(--sep)}
 .vday .vd-line>li.home .k::before{background:var(--tint)}
 .vday .vd-line>li.unit .k::before{background:var(--ink)}
@@ -2193,24 +2200,28 @@ function vanDayHtml(k) {
   const d = got.data, day = k.split("|")[0], isToday = !!arrivals && day === arrivals.today;
   const inDay = s => !!s && ukDay(s) === day, clk = s => ukClock(s);
   const NAME = { home: "Home", unit: "Unit 25", site: "On site", stop: "Stopped" };
+  // One labelled time: ARRIVED 07:10, LEFT 12:02, THERE FOR 4 h 52 min
+  const cell = (cls, label, value) => `<span class="${cls}"><span class="l">${esc(label)}</span><span class="v">${esc(value)}</span></span>`;
   const sum = [], rows = [];
   let prevEnd = null;
   for (const s of d.stops) {
     const leaves = s.to && inDay(s.to), place = s.kind === "stop" ? placeHtml(s) : s.kind === "site" && s.site ? `<span class="pl">${esc(s.site)}</span>` : "";
     if (prevEnd && inDay(prevEnd) && inDay(s.from) && vdMins(prevEnd, s.from) >= 1)
-      rows.push(`<li class="drive"><span class="t"></span><span class="k"></span><span class="b">${vdDur(vdMins(prevEnd, s.from))} drive</span></li>`);
-    let t, h, w;
+      rows.push(`<li class="drive"><span class="k"></span><span class="b">${vdDur(vdMins(prevEnd, s.from))} drive</span></li>`);
+    let h, cells = [], extra = "";
     if (s.before) {                       // parked there overnight: what matters is when it left
-      t = leaves ? clk(s.to) : "";
-      h = leaves ? `Left ${s.kind === "home" ? "home" : s.kind === "unit" ? "Unit 25" : s.kind === "site" ? "the site" : "overnight stop"}` : `${s.kind === "home" ? "At home" : s.kind === "stop" ? "Parked" : `At ${NAME[s.kind]}`} all day`;
-      w = leaves ? "parked there overnight" : "didn't move";
+      h = s.kind === "home" ? "Home" : s.kind === "stop" ? "Overnight stop" : NAME[s.kind];
+      cells.push(leaves ? cell("c-lft", "Left", clk(s.to)) : cell("c-for", "All day", "didn't move"));
+      extra = "Parked there overnight";
       if (leaves && s.kind === "home") sum.push(["home", `Left home ${clk(s.to)}`]);
     } else {
-      t = clk(s.from);
-      const end = leaves ? `${clk(s.from)}–${clk(s.to)} · ${vdDur(vdMins(s.from, s.to))}`
-        : s.to ? (s.kind === "home" ? `arrived ${clk(s.from)}` : `from ${clk(s.from)} · overnight`) : isToday ? `since ${clk(s.from)} · ${vdDur(vdMins(s.from, d.now))} so far` : `from ${clk(s.from)} · no leaving time`;
       h = s.kind === "home" && !leaves ? "Home for the night" : NAME[s.kind];
-      w = end + (s.seen === false ? " · may have arrived earlier" : "");
+      cells.push(cell("c-arr", s.kind === "stop" ? "Stopped" : "Arrived", clk(s.from)));
+      if (leaves) cells.push(cell("c-lft", "Left", clk(s.to)), cell("c-for", "There for", vdDur(vdMins(s.from, s.to))));
+      else if (!s.to && isToday) cells.push(cell("c-lft", "Left", "still there"), cell("c-for", "So far", vdDur(vdMins(s.from, d.now))));
+      else if (!s.to) cells.push(cell("c-lft", "Left", "not recorded"));
+      else if (s.kind !== "home") cells.push(cell("c-lft", "Left", "next day"));
+      if (s.seen === false) extra = "It may have arrived earlier";
       if (s.kind === "site") {   // one chip per site: first arrival to last departure (a lunch trip away doesn't split it)
         const was = sum.find(x => x[0] === "site" && x[2] === s.site);
         if (was) { was[3] = leaves ? s.to : null; was[1] = `On site ${clk(was[4])}${was[3] ? `–${clk(was[3])}` : ""}`; }
@@ -2220,7 +2231,7 @@ function vanDayHtml(k) {
       if (s.kind === "home" && !leaves) sum.push(["home", `Home ${clk(s.from)}`]);
     }
     const job = s.kind === "site" && s.job ? `<div class="j">${esc(s.job)}</div>` : "";
-    rows.push(`<li class="${s.kind}"><span class="t">${esc(t)}</span><span class="k"></span><div class="b"><div class="h">${esc(h)}${place}</div><div class="w">${esc(w)}</div>${job}</div></li>`);
+    rows.push(`<li class="${s.kind}"><span class="k"></span><div class="b"><div class="h">${esc(h)}${place}</div>${job}<div class="tm">${cells.join("")}</div>${extra ? `<div class="x">${esc(extra)}</div>` : ""}</div></li>`);
     prevEnd = s.to;
   }
   const since = d.since ? fullDate(ukDay(d.since)) : "";
