@@ -629,6 +629,29 @@ button.arow:active{background:var(--fill)}
 .arow .s.no{color:var(--gold-ink)}
 .arow .s.cant,.arow .s.closed,.arow .s.booked{font-weight:500;color:var(--ink-3)}
 .arr-meta{font-size:13px;line-height:1.4;color:var(--ink-3);font-variant-numeric:tabular-nums}
+/* the van's day (Super Admins): a fold-out timeline under a day's row in a job's Arrivals log */
+.arow .vd-toggle{grid-column:2;justify-self:start;display:inline-flex;align-items:center;gap:4px;margin-top:4px;padding:4px 0;font-size:13.5px}
+.arow .vd-toggle .ico{width:14px;height:14px;transition:transform .25s cubic-bezier(.2,.8,.2,1)}
+.arow .vd-toggle[aria-expanded="true"] .ico{transform:rotate(90deg)}
+.vday{grid-column:2;margin:6px 0 2px}
+.vday ol{list-style:none;margin:0;padding:0}
+.vday li{position:relative;display:grid;grid-template-columns:44px 14px minmax(0,1fr);column-gap:8px;align-items:start;padding:3px 0;font-size:13.5px;line-height:1.4}
+.vday li .t{color:var(--ink-2);font-weight:600;font-variant-numeric:tabular-nums;text-align:right}
+.vday li .k{position:relative;align-self:stretch}
+.vday li .k::before{content:"";position:absolute;left:3px;top:5px;width:8px;height:8px;border-radius:50%;background:var(--ink-3)}
+.vday li:not(:last-child) .k::after{content:"";position:absolute;left:6.5px;top:15px;bottom:-9px;width:1px;background:var(--sep)}
+.vday li.home .k::before{background:var(--tint)}
+.vday li.unit .k::before{background:var(--ink)}
+.vday li.site .k::before{background:var(--green-ink)}
+.vday li.stop .k::before{background:transparent;box-shadow:inset 0 0 0 1.5px var(--gold)}
+.vday li.drive{color:var(--ink-3);font-size:12.5px}
+.vday li.drive .k::before{display:none}
+.vday li b{font-weight:600}
+.vday li .d{color:var(--ink-3);font-variant-numeric:tabular-nums}
+.vday li a{color:var(--tint);text-decoration:none}
+@media (hover:hover){.vday li a:hover{text-decoration:underline}}
+.vday .vd-note{margin:6px 0 0;font-size:12.5px;line-height:1.4;color:var(--ink-3)}
+.vday .vd-skel{height:12px;margin:6px 0;border-radius:6px;background:var(--skeleton)}
 .arr-job{display:flex;flex-direction:column;gap:3px}
 .arr-job h3{font:600 17px/1.3 var(--font-text);letter-spacing:-.014em;overflow-wrap:anywhere}
 .arr-job p{font-size:13.5px;line-height:1.4;color:var(--ink-2);overflow-wrap:anywhere}
@@ -2090,6 +2113,7 @@ async function loadArrivals() {
     for (const v of r.visits) if (v && v.day && v.entry && v.fitter) by.set(`${v.day}|${v.entry}|${v.fitter}`, v);
     arrivals = { today: r.today, checkedAt: r.checkedAt, problem: r.problem || "", visits: r.visits, by, sig };
     syncArrivalsUI();
+    checkVanDay();
     if (data) renderAll();
     if (sheetUI.open && sheetKind === "arrivals") { const l = document.getElementById("arrList"); if (l) l.innerHTML = arrivalsList(); }
     else if (sheetUI.open && sheetKind === "arrival" && arrEntry) openArrival(arrEntry, arrBack);
@@ -2106,7 +2130,115 @@ function arrRow(v, withJob) {
   return withJob
     ? `<button type="button" class="arow" data-arr-open="${esc(v.entry)}"><i class="dot ${st.kind}" aria-hidden="true"></i><b>${who}</b>
         <span class="j">${esc(v.entryName || v.jobName || "Job")}${job ? ` · ${job}` : ""}</span><span class="s ${st.kind}">${esc(st.line)}</span></button>`
-    : `<div class="arow static"><i class="dot ${st.kind}" aria-hidden="true"></i><b>${who}</b><span class="s ${st.kind}">${esc(st.line)}</span>${detail}</div>`;
+    : `<div class="arow static"><i class="dot ${st.kind}" aria-hidden="true"></i><b>${who}</b><span class="s ${st.kind}">${esc(st.line)}</span>${detail}${vanDayFold(v)}</div>`;
+}
+
+/* ---------- the van's day: one van's whole day under a row of a job's log, for Super Admins ---------- */
+// public.fitter_van_day (Super Admins only; Admins and Users are refused, so they never see the button) turns FleetView's
+// 2-minute positions into the van's stops that day, already named: home, Unit 25, the site, or a stop elsewhere of 15
+// minutes or more. The page is never told where anyone lives; for a stop elsewhere it gets the point, and names the
+// town from postcodes.io. What's seen is the van, not who was in it.
+let vanDayOK = null;                 // null: not asked yet; then whether this account may see vans' days
+const vanDays = new Map();           // "day|reg|fitter" -> { state: "loading" | "ok" | "err", data }
+const vanDayOpen = new Set();        // keys open now (kept across the log's redraws)
+const vanPlaces = new Map();         // "lat,lon" -> "near Warwick" (or a Promise while asking)
+const vdKey = v => `${v.day}|${v.reg}|${v.fitter}`;
+async function checkVanDay() {
+  if (vanDayOK !== null || !hubClient) return;
+  vanDayOK = false;
+  try { const { data: r, error } = await hubClient.rpc("fitter_van_day", {}); vanDayOK = !error && !!r && r.ok === true; } catch (e) { vanDayOK = false; }
+  if (vanDayOK && sheetUI.open && sheetKind === "arrival" && arrEntry) openArrival(arrEntry, arrBack);
+}
+function vanDayFold(v) {
+  if (!vanDayOK || !v.reg) return "";
+  const k = vdKey(v), open = vanDayOpen.has(k), id = `vd-${btoa(unescape(encodeURIComponent(k))).replace(/[^A-Za-z0-9]/g, "")}`;
+  return `<button type="button" class="linkbtn vd-toggle" data-vd="${esc(k)}" aria-expanded="${open}" aria-controls="${id}">${icon("chev")}The van's day</button>
+    <div class="vday" id="${id}" ${open ? "" : "hidden"}>${open ? vanDayHtml(k) : ""}</div>`;
+}
+async function toggleVanDay(btn) {
+  const k = btn.dataset.vd, box = document.getElementById(btn.getAttribute("aria-controls"));
+  if (!box) return;
+  const open = btn.getAttribute("aria-expanded") !== "true";
+  btn.setAttribute("aria-expanded", String(open));
+  box.hidden = !open;
+  if (!open) { vanDayOpen.delete(k); return; }
+  vanDayOpen.add(k);
+  if (!vanDays.has(k) || vanDays.get(k).state === "err") {
+    vanDays.set(k, { state: "loading" });
+    box.innerHTML = vanDayHtml(k);
+    const [day, reg, ...rest] = k.split("|");
+    try {
+      const { data: r, error } = await hubClient.rpc("fitter_van_day", { p_day: day, p_reg: reg, p_fitter: rest.join("|") });
+      vanDays.set(k, error || !r || !Array.isArray(r.stops) ? { state: "err" } : { state: "ok", data: r });
+    } catch (e) { vanDays.set(k, { state: "err" }); }
+  }
+  box.innerHTML = vanDayHtml(k);
+  namePlaces(k);
+}
+const vdMins = (a, b) => Math.max(0, Math.round((Date.parse(b) - Date.parse(a)) / 60000));
+function vdDur(m) { const h = Math.floor(m / 60), r = m % 60; return h ? `${h} h${r ? ` ${r} min` : ""}` : `${m} min`; }
+function vanDayHtml(k) {
+  const got = vanDays.get(k);
+  if (!got || got.state === "loading") return `<div class="vd-skel" style="width:70%"></div><div class="vd-skel" style="width:52%"></div><div class="vd-skel" style="width:61%"></div>`;
+  if (got.state === "err") return `<p class="vd-note">The van's day couldn't be loaded. Close and open it again to retry.</p>`;
+  const d = got.data, day = k.split("|")[0], isToday = !!arrivals && day === arrivals.today;
+  const inDay = s => s && ukDay(s) === day;
+  const items = [];
+  let prevEnd = null;
+  for (const s of d.stops) {
+    const name = s.kind === "home" ? "Home" : s.kind === "unit" ? "Unit 25" : s.kind === "site" ? `Site${s.site ? ` · ${esc(s.site)}` : ""}` : "";
+    // Driving between two stops that day
+    if (prevEnd && inDay(prevEnd) && inDay(s.from) && vdMins(prevEnd, s.from) >= 1) items.push(`<li class="drive"><span class="t"></span><span class="k"></span><span>Driving ${vdDur(vdMins(prevEnd, s.from))}</span></li>`);
+    let time, text;
+    if (s.before) {                                    // there since the evening before: what matters is when it left
+      time = s.to && inDay(s.to) ? ukClock(s.to) : "";
+      const where = s.kind === "home" ? "home" : s.kind === "stop" ? "overnight stop" : name;
+      text = s.to && inDay(s.to) ? `<b>Left ${where}</b>` : `<b>${s.kind === "stop" ? "Parked" : `At ${s.kind === "home" ? "home" : name}`} all day</b>`;
+      if (s.kind === "stop") text += ` <span class="d">${placeHtml(s)}</span>`;
+    } else {
+      time = ukClock(s.from);
+      const ends = s.to && inDay(s.to) ? `left ${ukClock(s.to)} · ${vdDur(vdMins(s.from, s.to))}`
+        : s.to ? "overnight" : isToday ? `still there · ${vdDur(vdMins(s.from, d.now))} so far` : "no leaving time recorded";
+      const what = s.kind === "stop" ? `<b>Stopped</b> ${placeHtml(s)}` : s.kind === "home" ? "<b>Home</b>" : `<b>${name}</b>`;
+      const job = s.kind === "site" && s.job ? `<br><span class="d">${esc(s.job)}</span>` : "";
+      text = `${what} <span class="d">· ${ends}</span>${job}`;
+      if (s.seen === false) text += `<br><span class="d">It was already there when the van's day began being recorded, so it may have arrived earlier.</span>`;
+    }
+    items.push(`<li class="${s.kind}"><span class="t">${esc(time)}</span><span class="k"></span><span>${text}</span></li>`);
+    prevEnd = s.to;
+  }
+  const since = d.since ? fullDate(ukDay(d.since)) : "";
+  const none = d.since && day < ukDay(d.since) ? `Not recorded: vans' days are kept from ${since}.` : `No stops recorded for ${esc(d.reg)} that day.`;
+  const note = `From FleetView, checked every 2 minutes: it shows the van, not who was in it. Stops elsewhere under 15 minutes (fuel, traffic) aren't listed.${d.homeKnown ? "" : " Their home isn't on Team Details, so an overnight stop isn't called home."}`;
+  return `${items.length ? `<ol>${items.join("")}</ol>` : `<p class="vd-note">${none}</p>`}<p class="vd-note">${note}</p>`;
+}
+const ukDay = s => new Date(s).toLocaleDateString("en-CA", { timeZone: "Europe/London" });
+// A stop elsewhere: the nearest town, from postcodes.io, and a map link. Never a home: those come without a point.
+function placeHtml(s) {
+  if (typeof s.lat !== "number" || typeof s.lon !== "number") return "";
+  const p = vanPlaces.get(`${s.lat},${s.lon}`), map = `https://www.google.com/maps?q=${s.lat},${s.lon}`;
+  return `${typeof p === "string" && p ? `${esc(p)} · ` : ""}<a href="${esc(map)}" target="_blank" rel="noopener">map</a>`;
+}
+async function namePlaces(k) {
+  const got = vanDays.get(k);
+  if (!got || got.state !== "ok") return;
+  const asks = got.data.stops.filter(s => typeof s.lat === "number" && !vanPlaces.has(`${s.lat},${s.lon}`));
+  if (!asks.length) return;
+  await Promise.all(asks.map(async s => {
+    const key = `${s.lat},${s.lon}`;
+    vanPlaces.set(key, "");
+    try {
+      const r = await fetch(`https://api.postcodes.io/postcodes?lon=${s.lon}&lat=${s.lat}&limit=1&radius=2000&widesearch=true`).then(x => x.json());
+      const p = r && Array.isArray(r.result) && r.result[0];
+      // A parish where there is one (villages), else the town or district; never the long ward names
+      const town = p && (p.parish && !/unparished/i.test(p.parish) && p.parish.length <= 28 ? p.parish : p.admin_district);
+      if (town) vanPlaces.set(key, `near ${town}${p.outcode ? ` (${p.outcode})` : ""}`);
+    } catch (e) { /* the map link still works */ }
+  }));
+  for (const btn of document.querySelectorAll(".vd-toggle[aria-expanded='true']")) {
+    const box = document.getElementById(btn.getAttribute("aria-controls"));
+    if (box && btn.dataset.vd === k) box.innerHTML = vanDayHtml(k);
+  }
 }
 const arrDayTitle = d => d === arrivals.today ? "Today" : fullDate(d);
 function arrivalsList() {
@@ -2205,6 +2337,8 @@ document.addEventListener("click", ev => {
   const arow = ev.target.closest("[data-arr-open]");
   if (arow) { openArrival(arow.dataset.arrOpen, true); return; }
   if (ev.target.closest("#arrBack")) { openArrivals(); return; }
+  const vd = ev.target.closest(".vd-toggle");
+  if (vd) { toggleVanDay(vd); return; }
   const jt = ev.target.closest(".jrow[aria-controls]");
   if (jt) { toggleJob(jt); return; }
   const fh = ev.target.closest(".jfold-head");
