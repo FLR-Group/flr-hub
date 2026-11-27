@@ -633,24 +633,33 @@ button.arow:active{background:var(--fill)}
 .arow .vd-toggle{grid-column:2;justify-self:start;display:inline-flex;align-items:center;gap:4px;margin-top:4px;padding:4px 0;font-size:13.5px}
 .arow .vd-toggle .ico{width:14px;height:14px;transition:transform .25s cubic-bezier(.2,.8,.2,1)}
 .arow .vd-toggle[aria-expanded="true"] .ico{transform:rotate(90deg)}
-.vday{grid-column:2;margin:6px 0 2px}
-.vday ol{list-style:none;margin:0;padding:0}
-.vday li{position:relative;display:grid;grid-template-columns:44px 14px minmax(0,1fr);column-gap:8px;align-items:start;padding:3px 0;font-size:13.5px;line-height:1.4}
-.vday li .t{color:var(--ink-2);font-weight:600;font-variant-numeric:tabular-nums;text-align:right}
-.vday li .k{position:relative;align-self:stretch}
-.vday li .k::before{content:"";position:absolute;left:3px;top:5px;width:8px;height:8px;border-radius:50%;background:var(--ink-3)}
-.vday li:not(:last-child) .k::after{content:"";position:absolute;left:6.5px;top:15px;bottom:-9px;width:1px;background:var(--sep)}
-.vday li.home .k::before{background:var(--tint)}
-.vday li.unit .k::before{background:var(--ink)}
-.vday li.site .k::before{background:var(--green-ink)}
-.vday li.stop .k::before{background:transparent;box-shadow:inset 0 0 0 1.5px var(--gold)}
-.vday li.drive{color:var(--ink-3);font-size:12.5px}
-.vday li.drive .k::before{display:none}
-.vday li b{font-weight:600}
-.vday li .d{color:var(--ink-3);font-variant-numeric:tabular-nums}
-.vday li a{color:var(--tint);text-decoration:none}
-@media (hover:hover){.vday li a:hover{text-decoration:underline}}
-.vday .vd-note{margin:6px 0 0;font-size:12.5px;line-height:1.4;color:var(--ink-3)}
+.vday{grid-column:2;margin:8px 0 2px}
+.vday .vd-sum{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px;padding:0;list-style:none}
+.vday .vd-sum li{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:var(--fill);font-size:12.5px;font-weight:600;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.vday .vd-sum li i{width:7px;height:7px;border-radius:50%;background:var(--ink-3)}
+.vday .vd-sum li.home i{background:var(--tint)}.vday .vd-sum li.site i{background:var(--green-ink)}.vday .vd-sum li.unit i{background:var(--ink)}
+.vday ol.vd-line{list-style:none;margin:0;padding:0}
+.vday .vd-line>li{position:relative;display:grid;grid-template-columns:46px 18px minmax(0,1fr);column-gap:8px;align-items:start}
+.vday .vd-line .t{padding-top:1px;font-size:14px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;text-align:right}
+.vday .vd-line .k{position:relative;align-self:stretch}
+.vday .vd-line .k::before{content:"";position:absolute;left:4px;top:5px;width:10px;height:10px;border-radius:50%;background:var(--ink-3);box-shadow:0 0 0 3px var(--surface)}
+.vday .vd-line>li:not(:last-child) .k::after{content:"";position:absolute;left:8.5px;top:17px;bottom:-3px;width:1.5px;background:var(--sep)}
+.vday .vd-line>li.home .k::before{background:var(--tint)}
+.vday .vd-line>li.unit .k::before{background:var(--ink)}
+.vday .vd-line>li.site .k::before{background:var(--green-ink)}
+.vday .vd-line>li.stop .k::before{background:var(--surface);box-shadow:inset 0 0 0 2px var(--gold),0 0 0 3px var(--surface)}
+.vday .vd-line .b{min-width:0;padding-bottom:4px}
+.vday .vd-line .h{display:flex;flex-wrap:wrap;align-items:baseline;column-gap:6px;row-gap:0;font-size:14.5px;font-weight:600;line-height:1.35;color:var(--ink)}
+.vday .vd-line .h .pl{font-weight:500;color:var(--ink-2)}
+.vday .vd-line .h a{flex:none;display:inline-flex;align-self:center;color:var(--tint)}
+.vday .vd-line .h a .ico{width:15px;height:15px}
+.vday .vd-line .w{font-size:13px;line-height:1.4;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.vday .vd-line .j{font-size:12.5px;line-height:1.35;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vday .vd-line>li.drive{min-height:30px}
+.vday .vd-line>li.drive .k::before{display:none}
+.vday .vd-line>li.drive .k::after{top:0;bottom:0;background:repeating-linear-gradient(var(--ink-3) 0 3px,transparent 3px 6px);opacity:.5}
+.vday .vd-line>li.drive .b{align-self:center;padding:0;font-size:12px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.vday .vd-note{margin:10px 0 0;font-size:12px;line-height:1.4;color:var(--ink-3)}
 .vday .vd-skel{height:12px;margin:6px 0;border-radius:6px;background:var(--skeleton)}
 .arr-job{display:flex;flex-direction:column;gap:3px}
 .arr-job h3{font:600 17px/1.3 var(--font-text);letter-spacing:-.014em;overflow-wrap:anywhere}
@@ -2182,42 +2191,51 @@ function vanDayHtml(k) {
   if (!got || got.state === "loading") return `<div class="vd-skel" style="width:70%"></div><div class="vd-skel" style="width:52%"></div><div class="vd-skel" style="width:61%"></div>`;
   if (got.state === "err") return `<p class="vd-note">The van's day couldn't be loaded. Close and open it again to retry.</p>`;
   const d = got.data, day = k.split("|")[0], isToday = !!arrivals && day === arrivals.today;
-  const inDay = s => s && ukDay(s) === day;
-  const items = [];
+  const inDay = s => !!s && ukDay(s) === day, clk = s => ukClock(s);
+  const NAME = { home: "Home", unit: "Unit 25", site: "On site", stop: "Stopped" };
+  const sum = [], rows = [];
   let prevEnd = null;
   for (const s of d.stops) {
-    const name = s.kind === "home" ? "Home" : s.kind === "unit" ? "Unit 25" : s.kind === "site" ? `Site${s.site ? ` · ${esc(s.site)}` : ""}` : "";
-    // Driving between two stops that day
-    if (prevEnd && inDay(prevEnd) && inDay(s.from) && vdMins(prevEnd, s.from) >= 1) items.push(`<li class="drive"><span class="t"></span><span class="k"></span><span>Driving ${vdDur(vdMins(prevEnd, s.from))}</span></li>`);
-    let time, text;
-    if (s.before) {                                    // there since the evening before: what matters is when it left
-      time = s.to && inDay(s.to) ? ukClock(s.to) : "";
-      const where = s.kind === "home" ? "home" : s.kind === "stop" ? "overnight stop" : name;
-      text = s.to && inDay(s.to) ? `<b>Left ${where}</b>` : `<b>${s.kind === "stop" ? "Parked" : `At ${s.kind === "home" ? "home" : name}`} all day</b>`;
-      if (s.kind === "stop") text += ` <span class="d">${placeHtml(s)}</span>`;
+    const leaves = s.to && inDay(s.to), place = s.kind === "stop" ? placeHtml(s) : s.kind === "site" && s.site ? `<span class="pl">${esc(s.site)}</span>` : "";
+    if (prevEnd && inDay(prevEnd) && inDay(s.from) && vdMins(prevEnd, s.from) >= 1)
+      rows.push(`<li class="drive"><span class="t"></span><span class="k"></span><span class="b">${vdDur(vdMins(prevEnd, s.from))} drive</span></li>`);
+    let t, h, w;
+    if (s.before) {                       // parked there overnight: what matters is when it left
+      t = leaves ? clk(s.to) : "";
+      h = leaves ? `Left ${s.kind === "home" ? "home" : s.kind === "unit" ? "Unit 25" : s.kind === "site" ? "the site" : "overnight stop"}` : `${s.kind === "home" ? "At home" : s.kind === "stop" ? "Parked" : `At ${NAME[s.kind]}`} all day`;
+      w = leaves ? "parked there overnight" : "didn't move";
+      if (leaves && s.kind === "home") sum.push(["home", `Left home ${clk(s.to)}`]);
     } else {
-      time = ukClock(s.from);
-      const ends = s.to && inDay(s.to) ? `left ${ukClock(s.to)} · ${vdDur(vdMins(s.from, s.to))}`
-        : s.to ? "overnight" : isToday ? `still there · ${vdDur(vdMins(s.from, d.now))} so far` : "no leaving time recorded";
-      const what = s.kind === "stop" ? `<b>Stopped</b> ${placeHtml(s)}` : s.kind === "home" ? "<b>Home</b>" : `<b>${name}</b>`;
-      const job = s.kind === "site" && s.job ? `<br><span class="d">${esc(s.job)}</span>` : "";
-      text = `${what} <span class="d">· ${ends}</span>${job}`;
-      if (s.seen === false) text += `<br><span class="d">It was already there when the van's day began being recorded, so it may have arrived earlier.</span>`;
+      t = clk(s.from);
+      const end = leaves ? `${clk(s.from)}–${clk(s.to)} · ${vdDur(vdMins(s.from, s.to))}`
+        : s.to ? (s.kind === "home" ? `arrived ${clk(s.from)}` : `from ${clk(s.from)} · overnight`) : isToday ? `since ${clk(s.from)} · ${vdDur(vdMins(s.from, d.now))} so far` : `from ${clk(s.from)} · no leaving time`;
+      h = s.kind === "home" && !leaves ? "Home for the night" : NAME[s.kind];
+      w = end + (s.seen === false ? " · may have arrived earlier" : "");
+      if (s.kind === "site") {   // one chip per site: first arrival to last departure (a lunch trip away doesn't split it)
+        const was = sum.find(x => x[0] === "site" && x[2] === s.site);
+        if (was) { was[3] = leaves ? s.to : null; was[1] = `On site ${clk(was[4])}${was[3] ? `–${clk(was[3])}` : ""}`; }
+        else sum.push(["site", `On site ${clk(s.from)}${leaves ? `–${clk(s.to)}` : ""}`, s.site, leaves ? s.to : null, s.from]);
+      }
+      if (s.kind === "unit") sum.push(["unit", `Unit 25 ${clk(s.from)}`]);
+      if (s.kind === "home" && !leaves) sum.push(["home", `Home ${clk(s.from)}`]);
     }
-    items.push(`<li class="${s.kind}"><span class="t">${esc(time)}</span><span class="k"></span><span>${text}</span></li>`);
+    const job = s.kind === "site" && s.job ? `<div class="j">${esc(s.job)}</div>` : "";
+    rows.push(`<li class="${s.kind}"><span class="t">${esc(t)}</span><span class="k"></span><div class="b"><div class="h">${esc(h)}${place}</div><div class="w">${esc(w)}</div>${job}</div></li>`);
     prevEnd = s.to;
   }
   const since = d.since ? fullDate(ukDay(d.since)) : "";
   const none = d.since && day < ukDay(d.since) ? `Not recorded: vans' days are kept from ${since}.` : `No stops recorded for ${esc(d.reg)} that day.`;
-  const note = `From FleetView, checked every 2 minutes: it shows the van, not who was in it. Stops elsewhere under 15 minutes (fuel, traffic) aren't listed.${d.homeKnown ? "" : " Their home isn't on Team Details, so an overnight stop isn't called home."}`;
-  return `${items.length ? `<ol>${items.join("")}</ol>` : `<p class="vd-note">${none}</p>`}<p class="vd-note">${note}</p>`;
+  const note = `${esc(d.reg)} from FleetView · it shows the van, not who was in it · stops elsewhere under 15 minutes aren't listed${d.homeKnown ? "" : " · no home on Team Details for this fitter"}`;
+  return rows.length
+    ? `${sum.length ? `<ul class="vd-sum">${sum.map(([c, x]) => `<li class="${c}"><i></i>${esc(x)}</li>`).join("")}</ul>` : ""}<ol class="vd-line">${rows.join("")}</ol><p class="vd-note">${note}</p>`
+    : `<p class="vd-note">${none}</p>`;
 }
 const ukDay = s => new Date(s).toLocaleDateString("en-CA", { timeZone: "Europe/London" });
-// A stop elsewhere: the nearest town, from postcodes.io, and a map link. Never a home: those come without a point.
+// A stop elsewhere: the nearest town (postcodes.io) and a map pin. Never a home: those come without a point.
 function placeHtml(s) {
   if (typeof s.lat !== "number" || typeof s.lon !== "number") return "";
   const p = vanPlaces.get(`${s.lat},${s.lon}`), map = `https://www.google.com/maps?q=${s.lat},${s.lon}`;
-  return `${typeof p === "string" && p ? `${esc(p)} · ` : ""}<a href="${esc(map)}" target="_blank" rel="noopener">map</a>`;
+  return `<span class="pl">${typeof p === "string" && p ? esc(p) : ""}</span><a href="${esc(map)}" target="_blank" rel="noopener" aria-label="Show on a map" title="Show on a map">${icon("arrivals")}</a>`;
 }
 async function namePlaces(k) {
   const got = vanDays.get(k);
